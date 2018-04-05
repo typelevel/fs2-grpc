@@ -1,5 +1,6 @@
 import cats.effect.IO
-import com.example.protos.hello._
+import cats.implicits._
+import com.example.v1alpha.hello._
 import fs2._
 import io.grpc._
 
@@ -17,7 +18,8 @@ object Main extends StreamApp[IO] {
 
   def runProgram(helloStub: GreeterFs2Grpc[IO]): IO[Unit] = {
     for {
-      response <- helloStub.sayHello(HelloRequest("John Doe"), new Metadata())
+      response <- helloStub.sayHello(HelloRequest("John Doe"),
+                                     new Metadata())
       _ <- IO(println(response.message))
     } yield ()
   }

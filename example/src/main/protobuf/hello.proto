@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package com.example.protos;
+package com.example.v1alpha;
 
 // The greeting service definition.
 service Greeter {
@@ -13,6 +13,7 @@ service Greeter {
 // The request message containing the user's name.
 message HelloRequest {
   string name = 1;
+  int32 retry = 2;
 }
 
 // The response message containing the greetings

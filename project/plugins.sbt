@@ -8,5 +8,4 @@ addSbtPlugin("com.timushev.sbt" % "sbt-updates"   % "0.3.4")
 
 addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.3")
 
-addSbtPlugin("com.thesamet" % "sbt-protoc" % "0.99.18")
 libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.7.1"

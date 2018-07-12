@@ -37,7 +37,7 @@ lazy val `sbt-java-gen` = project
     crossSbtVersions := List(sbtVersion.value, "0.13.17"),
     buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
     addSbtPlugin("com.thesamet" % "sbt-protoc" % "0.99.18"),
-    libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.7.1"
+    libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % scalapb.compiler.Version.scalapbVersion
   )
 
 lazy val `java-runtime` = project
@@ -48,8 +48,8 @@ lazy val `java-runtime` = project
     publishTo := sonatypePublishTo.value,
     libraryDependencies ++= List(
       "co.fs2"        %% "fs2-core"         % "0.10.3",
-      "io.grpc"       % "grpc-core"         % "1.11.0",
-      "io.grpc"       % "grpc-netty-shaded" % "1.11.0" % "test",
+      "io.grpc"       % "grpc-core"         % scalapb.compiler.Version.grpcJavaVersion,
+      "io.grpc"       % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion % "test",
       "io.monix"      %% "minitest"         % "2.1.1" % "test",
       "org.typelevel" %% "cats-effect-laws" % "0.10" % "test"
     ),

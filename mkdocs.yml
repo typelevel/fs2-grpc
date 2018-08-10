@@ -1,0 +1,16 @@
+site_name: "fs2-grpc"
+nav:
+ - "SBT Setup": sbt_setup.md
+ - "Defining a Service": service.md
+ - "Creating a Server": server.md
+ - "Creating a Client": client.md
+theme:
+  name: material
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.details
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.emoji
+  - pymdownx.smartsymbols
+  - codehilite

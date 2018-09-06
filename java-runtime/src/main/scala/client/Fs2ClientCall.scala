@@ -5,8 +5,6 @@ import cats.implicits._
 import io.grpc.{Metadata, _}
 import fs2._
 
-import scala.concurrent.ExecutionContext
-
 case class UnaryResult[A](value: Option[A], status: Option[GrpcStatus])
 case class GrpcStatus(status: Status, trailers: Metadata)
 
@@ -37,7 +35,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCa
     stream.evalMap(sendMessage) ++ Stream.eval(halfClose)
   }
 
-  def unaryToUnaryCall(message: Request, headers: Metadata)(implicit F: Async[F], ec: ExecutionContext): F[Response] = {
+  def unaryToUnaryCall(message: Request, headers: Metadata)(implicit F: Async[F], cs: ContextShift[IO]): F[Response] = {
     for {
       listener <- startListener(Fs2UnaryClientCallListener[F, Response], headers)
       _        <- sendSingleMessage(message)
@@ -45,16 +43,16 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCa
     } yield result
   }
 
-  def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata)(implicit F: Effect[F],
-                                                                            ec: ExecutionContext): F[Response] = {
+  def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata)(implicit F: Concurrent[F],
+                                                                            cs: ContextShift[IO]): F[Response] = {
     for {
       listener <- startListener(Fs2UnaryClientCallListener[F, Response], headers)
       result   <- Stream.eval(listener.getValue).concurrently(sendStream(messages)).compile.last
     } yield result.get
   }
 
-  def unaryToStreamingCall(message: Request, headers: Metadata)(implicit F: Async[F],
-                                                                ec: ExecutionContext): Stream[F, Response] = {
+  def unaryToStreamingCall(message: Request, headers: Metadata)(implicit F: Concurrent[F],
+                                                                cs: ContextShift[IO]): Stream[F, Response] = {
     for {
       listener <- Stream.eval(
         startListener(Fs2StreamClientCallListener[F, Response](call.request), headers) <* sendSingleMessage(message))
@@ -62,8 +60,9 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCa
     } yield result
   }
 
-  def streamingToStreamingCall(messages: Stream[F, Request],
-                               headers: Metadata)(implicit F: Effect[F], ec: ExecutionContext): Stream[F, Response] = {
+  def streamingToStreamingCall(messages: Stream[F, Request], headers: Metadata)(
+      implicit F: Concurrent[F],
+      cs: ContextShift[IO]): Stream[F, Response] = {
     for {
       listener      <- Stream.eval(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))
       resultOrError <- listener.stream[F].concurrently(sendStream(messages))

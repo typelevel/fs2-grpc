@@ -1,19 +1,17 @@
 package org.lyranthe.fs2_grpc.java_runtime.client
 
-import cats.effect.{IO, LiftIO}
+import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.{ContextShift, IO, LiftIO}
 import cats.implicits._
 import io.grpc._
 
-import scala.concurrent.ExecutionContext
-
-class Fs2UnaryClientCallListener[Response](grpcStatus: fs2.async.Promise[IO, GrpcStatus],
-                                           value: fs2.async.Ref[IO, Option[Response]])
+class Fs2UnaryClientCallListener[Response](grpcStatus: Deferred[IO, GrpcStatus], value: Ref[IO, Option[Response]])
     extends ClientCall.Listener[Response] {
   override def onClose(status: Status, trailers: Metadata): Unit =
     grpcStatus.complete(GrpcStatus(status, trailers)).unsafeRunSync()
 
   override def onMessage(message: Response): Unit =
-    value.setAsync(message.some).unsafeRunSync()
+    value.set(message.some).unsafeRunSync()
 
   def getValue[F[_]](implicit F: LiftIO[F]): F[Response] = {
     val result: IO[Response] = for {
@@ -41,10 +39,10 @@ class Fs2UnaryClientCallListener[Response](grpcStatus: fs2.async.Promise[IO, Grp
 }
 
 object Fs2UnaryClientCallListener {
-  def apply[F[_], Response](implicit F: LiftIO[F], ec: ExecutionContext): F[Fs2UnaryClientCallListener[Response]] = {
+  def apply[F[_], Response](implicit F: LiftIO[F], cs: ContextShift[IO]): F[Fs2UnaryClientCallListener[Response]] = {
     F.liftIO(for {
-      response <- fs2.async.promise[IO, GrpcStatus]
-      value    <- fs2.async.refOf[IO, Option[Response]](None)
+      response <- Deferred[IO, GrpcStatus]
+      value    <- Ref[IO].of(none[Response])
     } yield new Fs2UnaryClientCallListener[Response](response, value))
   }
 }

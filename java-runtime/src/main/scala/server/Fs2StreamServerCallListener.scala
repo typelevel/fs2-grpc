@@ -5,12 +5,11 @@ import cats.effect._
 import cats.implicits._
 import io.grpc._
 import fs2._
-
-import scala.concurrent.ExecutionContext
+import fs2.concurrent.Queue
 
 class Fs2StreamServerCallListener[F[_], Request, Response] private (
-    queue: async.mutable.Queue[IO, Option[Request]],
-    val call: Fs2ServerCall[F, Request, Response])(implicit F: Effect[F])
+    queue: Queue[IO, Option[Request]],
+    val call: Fs2ServerCall[F, Request, Response])(implicit F: Concurrent[F])
     extends ServerCall.Listener[Request]
     with Fs2ServerCallListener[F, Stream[F, ?], Request, Response] {
   override def onMessage(message: Request): Unit = {
@@ -27,10 +26,10 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
 object Fs2StreamServerCallListener {
   class PartialFs2StreamServerCallListener[F[_]](val dummy: Boolean = false) extends AnyVal {
     def unsafeCreate[Request, Response](call: ServerCall[Request, Response])(
-        implicit F: Effect[F],
-        ec: ExecutionContext): Fs2StreamServerCallListener[F, Request, Response] = {
-      async
-        .unboundedQueue[IO, Option[Request]]
+        implicit F: Concurrent[F],
+        cs: ContextShift[IO]): Fs2StreamServerCallListener[F, Request, Response] = {
+      Queue
+        .unbounded[IO, Option[Request]]
         .map(new Fs2StreamServerCallListener[F, Request, Response](_, Fs2ServerCall[F, Request, Response](call)))
         .unsafeRunSync()
     }

@@ -11,7 +11,9 @@ import minitest._
 object ServerSuite extends SimpleTestSuite {
   test("single message to unaryToUnary") {
     implicit val ec = TestContext()
-    val dummy = new DummyServerCall
+    implicit val cs = IO.contextShift(ec)
+
+    val dummy    = new DummyServerCall
     val listener = Fs2UnaryServerCallListener[IO].unsafeCreate(dummy)
 
     listener
@@ -29,7 +31,9 @@ object ServerSuite extends SimpleTestSuite {
 
   test("multiple messages to unaryToUnary") {
     implicit val ec = TestContext()
-    val dummy = new DummyServerCall
+    implicit val cs = IO.contextShift(ec)
+
+    val dummy    = new DummyServerCall
     val listener = Fs2UnaryServerCallListener[IO].unsafeCreate(dummy)
 
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
@@ -44,22 +48,20 @@ object ServerSuite extends SimpleTestSuite {
     ec.tick()
 
     assertEquals(dummy.currentStatus.isDefined, true)
-    assertResult(true,
-                 "Current status true because stream completed successfully")(
-      dummy.currentStatus.get.isOk)
+    assertResult(true, "Current status true because stream completed successfully")(dummy.currentStatus.get.isOk)
   }
 
-  test("stream awaits termination of server") {
+  test("resource awaits termination of server") {
     implicit val ec = TestContext()
 
     import implicits._
-    val result = ServerBuilder.forPort(0).stream[IO].compile.last.unsafeToFuture()
+    val result = ServerBuilder.forPort(0).resource[IO].use(IO.pure).unsafeToFuture()
 
     ec.tick()
-    val server = result.value.get.get.get
+    val server = result.value.get.get
     assert(server.isTerminated)
   }
-  
+
 //  test("single message to unaryToStreaming") {
 //    val dummy = new DummyServerCall
 //

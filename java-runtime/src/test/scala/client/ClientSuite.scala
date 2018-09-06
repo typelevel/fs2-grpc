@@ -12,6 +12,7 @@ import scala.util.Success
 object ClientSuite extends SimpleTestSuite {
   test("single message to unaryToUnary") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -33,6 +34,7 @@ object ClientSuite extends SimpleTestSuite {
 
   test("no response message to unaryToUnary") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -51,6 +53,7 @@ object ClientSuite extends SimpleTestSuite {
 
   test("error response to unaryToUnary") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -74,6 +77,7 @@ object ClientSuite extends SimpleTestSuite {
 
   test("stream to streamingToUnary") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -98,6 +102,7 @@ object ClientSuite extends SimpleTestSuite {
 
   test("0-length to streamingToUnary") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -122,6 +127,7 @@ object ClientSuite extends SimpleTestSuite {
 
   test("single message to unaryToStreaming") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -146,6 +152,7 @@ object ClientSuite extends SimpleTestSuite {
 
   test("stream to streamingToStreaming") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -174,6 +181,7 @@ object ClientSuite extends SimpleTestSuite {
 
   test("error returned from streamingToStreaming") {
     implicit val ec = TestContext()
+    implicit val cs = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
     val client = new Fs2ClientCall[IO, String, Int](dummy)
@@ -206,14 +214,14 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(dummy.requested, 4)
   }
 
-  test("stream awaits termination of managed channel") {
+  test("resource awaits termination of managed channel") {
     implicit val ec = TestContext()
 
     import implicits._
-    val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).stream[IO].compile.last.unsafeToFuture()
+    val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()
 
     ec.tick()
-    val channel = result.value.get.get.get
+    val channel = result.value.get.get
     assert(channel.isTerminated)
   }
 }

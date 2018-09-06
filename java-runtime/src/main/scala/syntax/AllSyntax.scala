@@ -1,5 +1,3 @@
 package org.lyranthe.fs2_grpc.java_runtime.syntax
 
-trait AllSyntax
-    extends ManagedChannelBuilderSyntax
-    with ServerBuilderSyntax
+trait AllSyntax extends ManagedChannelBuilderSyntax with ServerBuilderSyntax

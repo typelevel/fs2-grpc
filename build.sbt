@@ -47,7 +47,7 @@ lazy val `java-runtime` = project
     crossScalaVersions := List(scalaVersion.value, "2.11.12"),
     publishTo := sonatypePublishTo.value,
     libraryDependencies ++= List(
-      "co.fs2"        %% "fs2-core"         % "1.0.0-RC2",
+      "co.fs2"        %% "fs2-core"         % "1.0.0",
       "org.typelevel" %% "cats-effect"      % "1.0.0",
       "org.typelevel" %% "cats-effect-laws" % "1.0.0" % "test",
       "io.grpc"       % "grpc-core"         % scalapb.compiler.Version.grpcJavaVersion,

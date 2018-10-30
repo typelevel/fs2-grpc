@@ -34,7 +34,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCa
   private def request(numMessages: Int)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.request(numMessages))
 
-  private def sendMessage(message: Request)(implicit F: Concurrent[F]): F[Unit] = {
+  private def sendMessage(message: Request)(implicit F: Sync[F]): F[Unit] = {
     F.delay(call.sendMessage(message))
   }
 
@@ -57,7 +57,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCa
     createListener.flatTap(start(_, headers)) <* request(1)
   }
 
-  def sendSingleMessage(message: Request)(implicit F: Concurrent[F]): F[Unit] = {
+  def sendSingleMessage(message: Request)(implicit F: Sync[F]): F[Unit] = {
     sendMessage(message) *> halfClose
   }
 

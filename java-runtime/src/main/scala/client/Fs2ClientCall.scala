@@ -3,6 +3,7 @@ package java_runtime
 package client
 
 import cats.effect._
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 import io.grpc.{Metadata, _}
 import fs2._
@@ -10,7 +11,19 @@ import fs2._
 final case class UnaryResult[A](value: Option[A], status: Option[GrpcStatus])
 final case class GrpcStatus(status: Status, trailers: Metadata)
 
-class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCall[Request, Response]) extends AnyVal {
+class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCall[Request, Response],
+                                                              val wakeOnReady: Ref[F, Option[Deferred[F, Unit]]]) {
+  def onReady()(implicit F: Sync[F]): F[Unit] = {
+    wakeOnReady
+      .modify({
+        case None       => (None, F.unit)
+        case Some(wake) => (None, wake.complete(()))
+      })
+      .flatten
+  }
+
+  private def isReady(implicit F: Sync[F]): F[Boolean] =
+    F.delay(call.isReady)
 
   private def cancel(message: Option[String], cause: Option[Throwable])(implicit F: Sync[F]): F[Unit] =
     F.delay(call.cancel(message.orNull, cause.orNull))
@@ -21,22 +34,35 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (val call: ClientCa
   private def request(numMessages: Int)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.request(numMessages))
 
-  private def sendMessage(message: Request)(implicit F: Sync[F]): F[Unit] =
+  private def sendMessage(message: Request)(implicit F: Concurrent[F]): F[Unit] = {
     F.delay(call.sendMessage(message))
+  }
+
+  private def sendMessageOrDelay(message: Request)(implicit F: Concurrent[F]): F[Unit] = {
+    isReady.ifM(
+      sendMessage(message), {
+        Deferred[F, Unit].flatMap { wakeup =>
+          wakeOnReady.set(wakeup.some) *>
+            isReady.ifM(sendMessage(message), wakeup.get *> sendMessage(message))
+        }
+      }
+    )
+  }
 
   private def start(listener: ClientCall.Listener[Response], metadata: Metadata)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.start(listener, metadata))
 
-  def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], headers: Metadata)(implicit F: Sync[F]): F[A] = {
+  def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], headers: Metadata)(
+      implicit F: Sync[F]): F[A] = {
     createListener.flatTap(start(_, headers)) <* request(1)
   }
 
-  def sendSingleMessage(message: Request)(implicit F: Sync[F]): F[Unit] = {
+  def sendSingleMessage(message: Request)(implicit F: Concurrent[F]): F[Unit] = {
     sendMessage(message) *> halfClose
   }
 
-  def sendStream(stream: Stream[F, Request])(implicit F: Sync[F]): Stream[F, Unit] = {
-    stream.evalMap(sendMessage) ++ Stream.eval(halfClose)
+  def sendStream(stream: Stream[F, Request])(implicit F: Concurrent[F]): Stream[F, Unit] = {
+    stream.evalMap(sendMessageOrDelay) ++ Stream.eval(halfClose)
   }
 
   def handleCallError(
@@ -82,8 +108,13 @@ object Fs2ClientCall {
         channel: Channel,
         methodDescriptor: MethodDescriptor[Request, Response],
         callOptions: CallOptions)(implicit F: Sync[F]): F[Fs2ClientCall[F, Request, Response]] =
-      F.delay(new Fs2ClientCall(channel.newCall[Request, Response](methodDescriptor, callOptions)))
+      apply(channel.newCall[Request, Response](methodDescriptor, callOptions))
 
+    def apply[Request, Response](call: ClientCall[Request, Response])(
+        implicit F: Sync[F]): F[Fs2ClientCall[F, Request, Response]] =
+      for {
+        wakeOnReady <- Ref[F].of(none[Deferred[F, Unit]])
+      } yield new Fs2ClientCall(call, wakeOnReady)
   }
 
   def apply[F[_]]: PartiallyAppliedClientCall[F] =

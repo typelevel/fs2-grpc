@@ -17,6 +17,10 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
 
   import Fs2UnaryServerCallListener._
 
+  override def onReady(): Unit = {
+    call.onReady().unsafeRun()
+  }
+
   override def onCancel(): Unit = {
     isCancelled.complete(()).unsafeRun()
   }
@@ -62,11 +66,8 @@ object Fs2UnaryServerCallListener {
         request     <- Ref.of[F, Option[Request]](none)
         isComplete  <- Deferred[F, Unit]
         isCancelled <- Deferred[F, Unit]
-      } yield
-        new Fs2UnaryServerCallListener[F, Request, Response](request,
-                                                             isComplete,
-                                                             isCancelled,
-                                                             Fs2ServerCall[F, Request, Response](call))
+        serverCall  <- Fs2ServerCall[F, Request, Response](call)
+      } yield new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall)
   }
 
   def apply[F[_]] = new PartialFs2UnaryServerCallListener[F]

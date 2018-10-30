@@ -20,7 +20,7 @@ object ClientSuite extends SimpleTestSuite {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()
     dummy.listener.get.onMessage(5)
 
@@ -44,7 +44,7 @@ object ClientSuite extends SimpleTestSuite {
     implicit val timer: Timer[IO]     = ec.timer
 
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result = client.unaryToUnaryCall("hello", new Metadata()).timeout(1.second).unsafeToFuture()
 
     ec.tick()
@@ -68,7 +68,7 @@ object ClientSuite extends SimpleTestSuite {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()
 
     dummy.listener.get.onClose(Status.OK, new Metadata())
@@ -87,9 +87,8 @@ object ClientSuite extends SimpleTestSuite {
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
-
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()
     dummy.listener.get.onMessage(5)
 
@@ -113,9 +112,8 @@ object ClientSuite extends SimpleTestSuite {
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
-
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result = client
       .streamingToUnaryCall(Stream.emits(List("a", "b", "c")), new Metadata())
       .unsafeToFuture()
@@ -140,9 +138,8 @@ object ClientSuite extends SimpleTestSuite {
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
-
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result = client
       .streamingToUnaryCall(Stream.empty, new Metadata())
       .unsafeToFuture()
@@ -168,7 +165,7 @@ object ClientSuite extends SimpleTestSuite {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result = client.unaryToStreamingCall("hello", new Metadata()).compile.toList.unsafeToFuture()
 
     dummy.listener.get.onMessage(1)
@@ -194,7 +191,7 @@ object ClientSuite extends SimpleTestSuite {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
@@ -225,7 +222,7 @@ object ClientSuite extends SimpleTestSuite {
     implicit val timer: Timer[IO]     = ec.timer
 
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
@@ -255,7 +252,7 @@ object ClientSuite extends SimpleTestSuite {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy  = new DummyClientCall()
-    val client = new Fs2ClientCall[IO, String, Int](dummy)
+    val client = Fs2ClientCall[IO](dummy).unsafeRunSync()
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
@@ -287,7 +284,7 @@ object ClientSuite extends SimpleTestSuite {
   }
 
   test("resource awaits termination of managed channel") {
-    implicit val ec: TestContext  = TestContext()
+    implicit val ec: TestContext = TestContext()
 
     import implicits._
     val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()

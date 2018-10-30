@@ -15,6 +15,9 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
     val call: Fs2ServerCall[F, Request, Response])(implicit F: Effect[F])
     extends ServerCall.Listener[Request]
     with Fs2ServerCallListener[F, Stream[F, ?], Request, Response] {
+  override def onReady(): Unit = {
+    call.onReady().unsafeRun()
+  }
 
   override def onCancel(): Unit = {
     isCancelled.complete(()).unsafeRun()
@@ -40,10 +43,8 @@ object Fs2StreamServerCallListener {
       for {
         inputQ      <- Queue.unbounded[F, Option[Request]]
         isCancelled <- Deferred[F, Unit]
-      } yield
-        new Fs2StreamServerCallListener[F, Request, Response](inputQ,
-                                                              isCancelled,
-                                                              Fs2ServerCall[F, Request, Response](call))
+        serverCall  <- Fs2ServerCall[F, Request, Response](call)
+      } yield new Fs2StreamServerCallListener[F, Request, Response](inputQ, isCancelled, serverCall)
   }
 
   def apply[F[_]] = new PartialFs2StreamServerCallListener[F]

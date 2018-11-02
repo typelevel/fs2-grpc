@@ -72,6 +72,8 @@ The generated code provides a method `bindService[F]` (for any `F` which has a `
 A `Server` is the type used by `grpc-java` to manage the server connections and lifecycle. This library provides syntax for `ServerBuilder`, which mirrors the pattern for the client. An example is:
 
 ```scala
+import org.lyranthe.fs2_grpc.java_runtime.implicits._
+
 val helloService: ServerServiceDefinition = MyFs2Grpc.bindService(new MyImpl())
 
 ServerBuilder

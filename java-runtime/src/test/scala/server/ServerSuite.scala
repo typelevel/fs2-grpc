@@ -11,13 +11,19 @@ import minitest._
 
 object ServerSuite extends SimpleTestSuite {
 
-  test("single message to unaryToUnary") {
+  private[this] val compressionOps = ServerCallOptions(Some(GzipCompressor))
+
+  test("single message to unaryToUnary")(singleUnaryToUnary())
+
+  test("single message to unaryToUnary with compression")(singleUnaryToUnary(compressionOps))
+
+  private[this] def singleUnaryToUnary(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy    = new DummyServerCall
-    val listener = Fs2UnaryServerCallListener[IO](dummy).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO](dummy, options).unsafeRunSync()
 
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
     listener.onMessage("123")
@@ -49,13 +55,17 @@ object ServerSuite extends SimpleTestSuite {
     assertEquals(cancelled.isCompleted, true)
   }
 
-  test("multiple messages to unaryToUnary") {
+  test("multiple messages to unaryToUnary")(multipleUnaryToUnary())
+
+  test("multiple messages to unaryToUnary with compression")(multipleUnaryToUnary(compressionOps))
+
+  private[this] def multipleUnaryToUnary(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy    = new DummyServerCall
-    val listener = Fs2UnaryServerCallListener[IO](dummy).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO](dummy, options).unsafeRunSync()
 
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
     listener.onMessage("123")
@@ -83,13 +93,17 @@ object ServerSuite extends SimpleTestSuite {
     assert(server.isTerminated)
   }
 
-  test("single message to unaryToStreaming") {
+  test("single message to unaryToStreaming")(singleUnaryToStreaming())
+
+  test("single message to unaryToStreaming witn compression")(singleUnaryToStreaming(compressionOps))
+
+  private[this] def singleUnaryToStreaming(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy    = new DummyServerCall
-    val listener = Fs2UnaryServerCallListener[IO].apply[String, Int](dummy).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO].apply[String, Int](dummy, options).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), s => Stream.eval(s).map(_.length).repeat.take(5))
     listener.onMessage("123")
@@ -142,13 +156,17 @@ object ServerSuite extends SimpleTestSuite {
     assertEquals(cancelled.isCompleted, true)
   }
 
-  test("messages to streamingToStreaming") {
+  test("messages to streamingToStreaming")(multipleStreamingToStreaming())
+
+  test("messages to streamingToStreaming with compression")(multipleStreamingToStreaming(compressionOps))
+
+  private[this] def multipleStreamingToStreaming(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
     val dummy    = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, options).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _.map(_.length).intersperse(0))
     listener.onMessage("a")
@@ -187,7 +205,11 @@ object ServerSuite extends SimpleTestSuite {
     assertEquals(dummy.currentStatus.get.isOk, false)
   }
 
-  test("streaming to unary") {
+  test("streaming to unary")(streamingToUnary())
+
+  test("streaming to unary with compression")(streamingToUnary(compressionOps))
+
+  private[this] def streamingToUnary(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
@@ -196,7 +218,7 @@ object ServerSuite extends SimpleTestSuite {
       _.compile.foldMonoid.map(_.length)
 
     val dummy    = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, options).unsafeRunSync()
 
     listener.unsafeUnaryResponse(new Metadata(), implementation)
     listener.onMessage("ab")

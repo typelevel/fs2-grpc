@@ -55,18 +55,18 @@ object Fs2UnaryServerCallListener {
 
   class PartialFs2UnaryServerCallListener[F[_]](val dummy: Boolean = false) extends AnyVal {
 
-    def apply[Request, Response](call: ServerCall[Request, Response])(
+    def apply[Request, Response](
+        call: ServerCall[Request, Response],
+        options: ServerCallOptions = ServerCallOptions.empty)(
         implicit F: ConcurrentEffect[F]
     ): F[Fs2UnaryServerCallListener[F, Request, Response]] =
       for {
         request     <- Ref.of[F, Option[Request]](none)
         isComplete  <- Deferred[F, Unit]
         isCancelled <- Deferred[F, Unit]
+        serverCall  <- Fs2ServerCall[F, Request, Response](call, options)
       } yield
-        new Fs2UnaryServerCallListener[F, Request, Response](request,
-                                                             isComplete,
-                                                             isCancelled,
-                                                             Fs2ServerCall[F, Request, Response](call))
+        new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall)
   }
 
   def apply[F[_]] = new PartialFs2UnaryServerCallListener[F]

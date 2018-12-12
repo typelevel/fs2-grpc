@@ -11,13 +11,13 @@ import minitest._
 
 object ServerSuite extends SimpleTestSuite {
 
-  private[this] val compressionOps = ServerCallOptions(Some(GzipCompressor))
+  private[this] val compressionOps = ServerCallOptions.default.withServerCompressor(Some(GzipCompressor))
 
   test("single message to unaryToUnary")(singleUnaryToUnary())
 
   test("single message to unaryToUnary with compression")(singleUnaryToUnary(compressionOps))
 
-  private[this] def singleUnaryToUnary(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
+  private[this] def singleUnaryToUnary(options: ServerCallOptions = ServerCallOptions.default): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
@@ -59,7 +59,7 @@ object ServerSuite extends SimpleTestSuite {
 
   test("multiple messages to unaryToUnary with compression")(multipleUnaryToUnary(compressionOps))
 
-  private[this] def multipleUnaryToUnary(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
+  private[this] def multipleUnaryToUnary(options: ServerCallOptions = ServerCallOptions.default): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
@@ -97,7 +97,7 @@ object ServerSuite extends SimpleTestSuite {
 
   test("single message to unaryToStreaming witn compression")(singleUnaryToStreaming(compressionOps))
 
-  private[this] def singleUnaryToStreaming(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
+  private[this] def singleUnaryToStreaming(options: ServerCallOptions = ServerCallOptions.default): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
@@ -160,7 +160,7 @@ object ServerSuite extends SimpleTestSuite {
 
   test("messages to streamingToStreaming with compression")(multipleStreamingToStreaming(compressionOps))
 
-  private[this] def multipleStreamingToStreaming(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
+  private[this] def multipleStreamingToStreaming(options: ServerCallOptions = ServerCallOptions.default): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
@@ -209,7 +209,7 @@ object ServerSuite extends SimpleTestSuite {
 
   test("streaming to unary with compression")(streamingToUnary(compressionOps))
 
-  private[this] def streamingToUnary(options: ServerCallOptions = ServerCallOptions.empty): Unit = {
+  private[this] def streamingToUnary(options: ServerCallOptions = ServerCallOptions.default): Unit = {
 
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)

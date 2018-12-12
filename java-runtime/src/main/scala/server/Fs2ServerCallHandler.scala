@@ -11,7 +11,7 @@ class Fs2ServerCallHandler[F[_]](val dummy: Boolean = false) extends AnyVal {
 
   def unaryToUnaryCall[Request, Response](
       implementation: (Request, Metadata) => F[Response],
-      options: ServerCallOptions = ServerCallOptions.empty)(
+      options: ServerCallOptions = ServerCallOptions.default)(
       implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
@@ -23,7 +23,7 @@ class Fs2ServerCallHandler[F[_]](val dummy: Boolean = false) extends AnyVal {
 
   def unaryToStreamingCall[Request, Response](
       implementation: (Request, Metadata) => Stream[F, Response],
-      options: ServerCallOptions = ServerCallOptions.empty)(
+      options: ServerCallOptions = ServerCallOptions.default)(
       implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
@@ -36,7 +36,7 @@ class Fs2ServerCallHandler[F[_]](val dummy: Boolean = false) extends AnyVal {
 
   def streamingToUnaryCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => F[Response],
-      options: ServerCallOptions = ServerCallOptions.empty)(
+      options: ServerCallOptions = ServerCallOptions.default)(
       implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
@@ -48,7 +48,7 @@ class Fs2ServerCallHandler[F[_]](val dummy: Boolean = false) extends AnyVal {
 
   def streamingToStreamingCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => Stream[F, Response],
-      options: ServerCallOptions = ServerCallOptions.empty)(
+      options: ServerCallOptions = ServerCallOptions.default)(
       implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {

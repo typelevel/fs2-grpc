@@ -36,7 +36,7 @@ object Fs2StreamServerCallListener {
 
     def apply[Request, Response](
         call: ServerCall[Request, Response],
-        options: ServerCallOptions = ServerCallOptions.empty)(
+        options: ServerCallOptions = ServerCallOptions.default)(
         implicit F: ConcurrentEffect[F]
     ): F[Fs2StreamServerCallListener[F, Request, Response]] =
       for {

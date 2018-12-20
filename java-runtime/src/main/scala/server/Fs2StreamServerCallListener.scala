@@ -34,16 +34,17 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
 object Fs2StreamServerCallListener {
   class PartialFs2StreamServerCallListener[F[_]](val dummy: Boolean = false) extends AnyVal {
 
-    def apply[Request, Response](call: ServerCall[Request, Response])(
+    def apply[Request, Response](
+        call: ServerCall[Request, Response],
+        options: ServerCallOptions = ServerCallOptions.default)(
         implicit F: ConcurrentEffect[F]
     ): F[Fs2StreamServerCallListener[F, Request, Response]] =
       for {
         inputQ      <- Queue.unbounded[F, Option[Request]]
         isCancelled <- Deferred[F, Unit]
+        serverCall  <- Fs2ServerCall[F, Request, Response](call, options)
       } yield
-        new Fs2StreamServerCallListener[F, Request, Response](inputQ,
-                                                              isCancelled,
-                                                              Fs2ServerCall[F, Request, Response](call))
+        new Fs2StreamServerCallListener[F, Request, Response](inputQ, isCancelled, serverCall)
   }
 
   def apply[F[_]] = new PartialFs2StreamServerCallListener[F]

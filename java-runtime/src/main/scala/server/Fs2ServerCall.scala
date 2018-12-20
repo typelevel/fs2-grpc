@@ -3,6 +3,7 @@ package java_runtime
 package server
 
 import cats.effect._
+import cats.syntax.functor._
 import io.grpc._
 
 // TODO: Add attributes, compression, message compression.
@@ -21,6 +22,11 @@ private[server] class Fs2ServerCall[F[_], Request, Response](val call: ServerCal
 }
 
 private[server] object Fs2ServerCall {
-  def apply[F[_], Request, Response](call: ServerCall[Request, Response]): Fs2ServerCall[F, Request, Response] =
-    new Fs2ServerCall[F, Request, Response](call)
+
+  def apply[F[_]: Sync, Request, Response](
+      call: ServerCall[Request, Response],
+      options: ServerCallOptions): F[Fs2ServerCall[F, Request, Response]] =
+    Sync[F]
+      .delay(options.compressor.map(_.name).foreach(call.setCompression))
+      .as(new Fs2ServerCall[F, Request, Response](call))
 }

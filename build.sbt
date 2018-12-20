@@ -48,8 +48,8 @@ lazy val `java-runtime` = project
     publishTo := sonatypePublishTo.value,
     libraryDependencies ++= List(
       "co.fs2"        %% "fs2-core"         % "1.0.0",
-      "org.typelevel" %% "cats-effect"      % "1.0.0",
-      "org.typelevel" %% "cats-effect-laws" % "1.0.0" % "test",
+      "org.typelevel" %% "cats-effect"      % "1.1.0",
+      "org.typelevel" %% "cats-effect-laws" % "1.1.0" % "test",
       "io.grpc"       % "grpc-core"         % scalapb.compiler.Version.grpcJavaVersion,
       "io.grpc"       % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion % "test",
       "io.monix"      %% "minitest"         % "2.2.2" % "test"

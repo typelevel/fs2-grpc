@@ -56,5 +56,5 @@ lazy val `java-runtime` = project
     ),
     mimaPreviousArtifacts := Set(organization.value %% name.value % "0.3.0"),
     testFrameworks += new TestFramework("minitest.runner.Framework"),
-    addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.8" cross CrossVersion.binary)
+    addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.9" cross CrossVersion.binary)
   )

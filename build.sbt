@@ -43,7 +43,7 @@ lazy val `sbt-java-gen` = project
 lazy val `java-runtime` = project
   .enablePlugins(GitVersioning)
   .settings(
-    scalaVersion := "2.12.7",
+    scalaVersion := "2.12.8",
     crossScalaVersions := List(scalaVersion.value, "2.11.12"),
     publishTo := sonatypePublishTo.value,
     libraryDependencies ++= List(

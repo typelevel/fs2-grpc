@@ -65,6 +65,15 @@ for {
 } yield ()
 ```
 
+If a `ManagedChannelProvider` isn't found on your classpath you may receive an error similar to 
+```
+io.grpc.ManagedChannelProvider$ProviderNotFoundException: No functional channel service provider found. Try adding a dependency on the grpc-okhttp or grpc-netty artifact
+```
+This can be fixed by adding a dependency to the [netty provider](https://github.com/grpc/grpc-java#transport) e.g.
+```
+libraryDependencies += "io.grpc" % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion
+```
+
 ## Creating a server
 
 The generated code provides a method `bindService[F]` (for any `F` which has a `Sync` instance), and it takes an implementation of the service (in a trait), which is used to serve responses to RPC calls. It returns a `ServerServiceDefinition` which is given to the server builder when setting up the service.

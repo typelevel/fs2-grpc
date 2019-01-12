@@ -110,3 +110,9 @@ The full set of options available are:
  - `CodeGeneratorOption.Fs2Grpc` (included by default) - generate grpc bindings for FS2/cats
  - `CodeGeneratorOption.SingleLineToProtoString` - `toProtoString` generates single line
  - `CodeGeneratorOption.AsciiFormatToString` - `toString` uses `toProtoString` functionality
+
+## Pass additional protoc options
+
+```scala
+PB.protocOptions in Compile := Seq("-xyz")
+```

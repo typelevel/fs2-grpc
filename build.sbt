@@ -52,7 +52,7 @@ lazy val `java-runtime` = project
       "org.typelevel" %% "cats-effect-laws" % "1.1.0" % "test",
       "io.grpc"       % "grpc-core"         % scalapb.compiler.Version.grpcJavaVersion,
       "io.grpc"       % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion % "test",
-      "io.monix"      %% "minitest"         % "2.3.1" % "test"
+      "io.monix"      %% "minitest"         % "2.3.2" % "test"
     ),
     mimaPreviousArtifacts := Set(organization.value %% name.value % "0.3.0"),
     testFrameworks += new TestFramework("minitest.runner.Framework"),

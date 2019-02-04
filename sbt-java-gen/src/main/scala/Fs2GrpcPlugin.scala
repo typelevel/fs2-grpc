@@ -47,8 +47,8 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
                 acc + (fp.getName -> FileDescriptor.buildFrom(fp, deps.toArray))
             }
 
+          val implicits = new DescriptorImplicits(params, filesByName.values.toVector)
           val genFiles  = request.getFileToGenerateList.asScala.map(filesByName)
-          val implicits = new DescriptorImplicits(params, genFiles)
           val srvFiles  = genFiles.flatMap(generateServiceFiles(_, implicits))
           b.addAllFile(srvFiles.asJava)
         } catch {

@@ -34,7 +34,7 @@ lazy val `sbt-java-gen` = project
   .settings(
     publishTo := sonatypePublishTo.value,
     sbtPlugin := true,
-    crossSbtVersions := List(sbtVersion.value, "0.13.17"),
+    crossSbtVersions := List(sbtVersion.value, "0.13.18"),
     buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
     addSbtPlugin("com.thesamet" % "sbt-protoc" % "0.99.19"),
     libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % scalapb.compiler.Version.scalapbVersion

@@ -16,18 +16,17 @@ import scala.collection.JavaConverters._
 
 sealed trait CodeGeneratorOption extends Product with Serializable
 
-object Fs2CodeGenerator extends ProtocCodeGenerator {
+class Fs2CodeGenerator(serviceSuffix: String) extends ProtocCodeGenerator {
 
   def generateServiceFiles(file: FileDescriptor,
                            di: DescriptorImplicits): Seq[PluginProtos.CodeGeneratorResponse.File] = {
-    println("Services: " + file.getServices.asScala)
     file.getServices.asScala.map { service =>
-      val p = new Fs2GrpcServicePrinter(service, di)
+      val p = new Fs2GrpcServicePrinter(service, serviceSuffix, di)
 
       import di.{ServiceDescriptorPimp, FileDescriptorPimp}
       val code = p.printService(FunctionalPrinter()).result()
       val b    = CodeGeneratorResponse.File.newBuilder()
-      b.setName(file.scalaDirectory + "/" + service.objectName + "Fs2.scala")
+      b.setName(file.scalaDirectory + "/" + service.name + s"$serviceSuffix.scala")
       b.setContent(code)
       println(b.getName)
       b.build
@@ -116,6 +115,11 @@ object Fs2GrpcPlugin extends AutoPlugin {
       settingKey[File]("Directory containing protobuf files for scalapb")
     val scalapbCodeGenerators =
       settingKey[Seq[Target]]("Code generators for scalapb")
+    val fs2GrpcServiceSuffix =
+      settingKey[String](
+        "Suffix used for generated service, e.g. service `Foo` with suffix `Fs2Grpc` results in `FooFs2Grpc`"
+      )
+
   }
   import autoImport._
 
@@ -133,13 +137,14 @@ object Fs2GrpcPlugin extends AutoPlugin {
   }
 
   override def projectSettings: Seq[Def.Setting[_]] = List(
+    fs2GrpcServiceSuffix := "Fs2Grpc",
     scalapbProtobufDirectory := (sourceManaged in Compile).value / "scalapb",
     scalapbCodeGenerators := {
       Target(convertOptionsToScalapbGen(scalapbCodeGeneratorOptions.value.toSet),
              (sourceManaged in Compile).value / "scalapb") ::
         Option(
         Target(
-          (JvmGenerator("scala-fs2-grpc", Fs2CodeGenerator),
+          (JvmGenerator("scala-fs2-grpc", new Fs2CodeGenerator(fs2GrpcServiceSuffix.value)),
            scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString)),
           (sourceManaged in Compile).value / "fs2-grpc"
         ))

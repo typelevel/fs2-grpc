@@ -44,7 +44,7 @@ lazy val `java-runtime` = project
   .enablePlugins(GitVersioning)
   .settings(
     scalaVersion := "2.12.8",
-    crossScalaVersions := List(scalaVersion.value, "2.11.12"),
+    crossScalaVersions := List(scalaVersion.value, "2.11.12", "2.13.0-M5"),
     publishTo := sonatypePublishTo.value,
     libraryDependencies ++= List(
       "co.fs2"        %% "fs2-core"         % "1.0.3",

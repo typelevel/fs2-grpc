@@ -29,15 +29,28 @@ lazy val root = project.in(file("."))
   )
   .aggregate(`sbt-java-gen`, `java-runtime`)
 
-lazy val `sbt-java-gen` = project
+lazy val `java-gen` = project
   .enablePlugins(GitVersioning, BuildInfoPlugin)
+  .settings(
+    scalaVersion := "2.12.8",
+    crossScalaVersions := List(scalaVersion.value, "2.11.12", "2.13.0-M5"),
+    publishTo := sonatypePublishTo.value,
+    buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
+    libraryDependencies ++= List(
+      "com.thesamet.scalapb" %% "protoc-bridge"  % "0.7.6",
+      "com.thesamet.scalapb" %% "compilerplugin" % scalapb.compiler.Version.scalapbVersion,
+    )
+  )
+
+lazy val `sbt-java-gen` = project
+  .dependsOn(`java-gen`)
+  .enablePlugins(GitVersioning)
   .settings(
     publishTo := sonatypePublishTo.value,
     sbtPlugin := true,
     crossSbtVersions := List(sbtVersion.value, "0.13.18"),
     buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
     addSbtPlugin("com.thesamet" % "sbt-protoc" % "0.99.21"),
-    libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % scalapb.compiler.Version.scalapbVersion
   )
 
 lazy val `java-runtime` = project

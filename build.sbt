@@ -1,3 +1,5 @@
+import Dependencies._
+
 inThisBuild(
   List(
     organization := "org.lyranthe.fs2-grpc",
@@ -36,25 +38,19 @@ lazy val `sbt-java-gen` = project
     sbtPlugin := true,
     crossSbtVersions := List(sbtVersion.value, "0.13.18"),
     buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
-    addSbtPlugin("com.thesamet" % "sbt-protoc" % "0.99.23"),
-    libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % scalapb.compiler.Version.scalapbVersion
+    addSbtPlugin(sbtProtoc),
+    libraryDependencies += scalaPbCompiler
   )
 
 lazy val `java-runtime` = project
   .enablePlugins(GitVersioning)
   .settings(
-    scalaVersion := "2.12.8",
-    crossScalaVersions := List(scalaVersion.value, "2.11.12", "2.13.0-M5"),
+    scalaVersion := "2.13.0",
+    crossScalaVersions := List(scalaVersion.value, "2.12.8", "2.11.12"),
     publishTo := sonatypePublishTo.value,
-    libraryDependencies ++= List(
-      "co.fs2"        %% "fs2-core"         % "1.0.4",
-      "org.typelevel" %% "cats-effect"      % "1.3.1",
-      "org.typelevel" %% "cats-effect-laws" % "1.3.1" % "test",
-      "io.grpc"       % "grpc-core"         % scalapb.compiler.Version.grpcJavaVersion,
-      "io.grpc"       % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion % "test",
-      "io.monix"      %% "minitest"         % "2.3.2" % "test"
-    ),
+    libraryDependencies ++= List(fs2, catsEffect, grpcCore) ++ List(grpcNetty, catsEffectLaws, minitest).map(_  % Test),
     mimaPreviousArtifacts := Set(organization.value %% name.value % "0.3.0"),
+    Test / parallelExecution := false,
     testFrameworks += new TestFramework("minitest.runner.Framework"),
-    addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.9" cross CrossVersion.binary)
+    addCompilerPlugin(kindProjector)
   )

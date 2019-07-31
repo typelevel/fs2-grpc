@@ -25,14 +25,18 @@ object ServerSuite extends SimpleTestSuite {
     val dummy    = new DummyServerCall
     val listener = Fs2UnaryServerCallListener[IO](dummy, options).unsafeRunSync()
 
-    listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
+    val testKey = Context.key[Int]("test-key")
+    val testKeyValue = 3123
+    Context.current().withValue(testKey, testKeyValue).run(new Runnable {
+      override def run(): Unit = listener.unsafeUnaryResponse(new Metadata(), _.map(_.length + testKey.get()))
+    })
     listener.onMessage("123")
     listener.onHalfClose()
 
     ec.tick()
 
     assertEquals(dummy.messages.size, 1)
-    assertEquals(dummy.messages(0), 3)
+    assertEquals(dummy.messages(0), 3 + testKeyValue)
     assertEquals(dummy.currentStatus.isDefined, true)
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
@@ -189,9 +193,13 @@ object ServerSuite extends SimpleTestSuite {
     val dummy    = new DummyServerCall
     val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy).unsafeRunSync()
 
-    listener.unsafeStreamResponse(
-      new Metadata(),
-      _.map(_.length) ++ Stream.emit(0) ++ Stream.raiseError[IO](new RuntimeException("hello")))
+    val testKey = Context.key[Int]("test-key")
+    val testKeyValue = 3123
+    Context.current().withValue(testKey, testKeyValue).run(new Runnable {
+      override def run(): Unit = listener.unsafeStreamResponse(
+        new Metadata(),
+        _.map(_.length) ++ Stream.emit(0) ++ Stream.eval(IO(testKey.get())) ++ Stream.raiseError[IO](new RuntimeException("hello")))
+    })
     listener.onMessage("a")
     listener.onMessage("ab")
     listener.onHalfClose()
@@ -199,8 +207,8 @@ object ServerSuite extends SimpleTestSuite {
 
     ec.tick()
 
-    assertEquals(dummy.messages.length, 3)
-    assertEquals(dummy.messages.toList, List(1, 2, 0))
+    assertEquals(dummy.messages.length, 4)
+    assertEquals(dummy.messages.toList, List(1, 2, 0, testKeyValue))
     assertEquals(dummy.currentStatus.isDefined, true)
     assertEquals(dummy.currentStatus.get.isOk, false)
   }
@@ -214,13 +222,17 @@ object ServerSuite extends SimpleTestSuite {
     implicit val ec: TestContext      = TestContext()
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
 
-    val implementation: Stream[IO, String] => IO[Int] =
-      _.compile.foldMonoid.map(_.length)
+    val testKey = Context.key[Int]("test-key")
+    val testKeyValue = 3123
+    val implementation: Stream[IO, String] => IO[Int] = stream =>
+      IO(testKey.get) >>= (value => stream.compile.foldMonoid.map(_.length + value))
 
     val dummy    = new DummyServerCall
     val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, options).unsafeRunSync()
 
-    listener.unsafeUnaryResponse(new Metadata(), implementation)
+    Context.current().withValue(testKey, testKeyValue).run(new Runnable {
+      override def run(): Unit = listener.unsafeUnaryResponse(new Metadata(), implementation)
+    })
     listener.onMessage("ab")
     listener.onMessage("abc")
     listener.onHalfClose()
@@ -228,7 +240,7 @@ object ServerSuite extends SimpleTestSuite {
     ec.tick()
 
     assertEquals(dummy.messages.length, 1)
-    assertEquals(dummy.messages(0), 5)
+    assertEquals(dummy.messages(0), 5 + testKeyValue)
     assertEquals(dummy.currentStatus.isDefined, true)
     assertEquals(dummy.currentStatus.get.isOk, true)
   }

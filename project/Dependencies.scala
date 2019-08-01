@@ -7,7 +7,7 @@ object Dependencies {
     val grpc          = scalapb.compiler.Version.grpcJavaVersion
     val scalaPb       = scalapb.compiler.Version.scalapbVersion
     val fs2           = "1.1.0-M1"
-    val catsEffect    = "2.0.0-M4"
+    val catsEffect    = "2.0.0-M5"
     val minitest      = "2.5.0"
 
     val kindProjector = "0.10.3"

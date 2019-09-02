@@ -114,7 +114,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
       s"def service[F[_]: $ConcurrentEffect, $Ctx](serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => Either[$Error, $Ctx]): $ServerServiceDefinition = {")
       .indent
       .newline
-      .add(s"val g: $Metadata ⇒ F[$Ctx] = f(_).leftMap[Throwable]($FailedPrecondition.withDescription(_).asRuntimeException()).raiseOrPure[F]")
+      .add(s"val g: $Metadata => F[$Ctx] = f(_).leftMap[Throwable]($FailedPrecondition.withDescription(_).asRuntimeException()).raiseOrPure[F]")
       .newline
       .add(s"$ServerServiceDefinition")
       .call(serviceBindingImplementations)

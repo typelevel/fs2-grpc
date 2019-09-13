@@ -7,7 +7,7 @@
 
 `project/plugins.sbt`:
 ```scala
-addSbtPlugin("org.lyranthe.fs2-grpc" % "sbt-java-gen" % "0.4.1")
+addSbtPlugin("org.lyranthe.fs2-grpc" % "sbt-java-gen" % "0.5.0")
 ```
 
 `build.sbt`:

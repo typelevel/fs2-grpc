@@ -35,7 +35,7 @@ lazy val root = project.in(file("."))
 lazy val `sbt-java-gen` = project
   .enablePlugins(GitVersioning, BuildInfoPlugin)
   .settings(
-    publishTo := sonatypePublishTo.value,
+    publishTo := sonatypePublishToBundle.value,
     sbtPlugin := true,
     crossSbtVersions := List(sbtVersion.value),
     buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
@@ -48,7 +48,7 @@ lazy val `java-runtime` = project
   .settings(
     scalaVersion := "2.13.0",
     crossScalaVersions := List(scalaVersion.value, "2.12.9", "2.11.12"),
-    publishTo := sonatypePublishTo.value,
+    publishTo := sonatypePublishToBundle.value,
     libraryDependencies ++= List(fs2, catsEffect, grpcCore) ++ List(grpcNetty, catsEffectLaws, minitest).map(_  % Test),
     mimaPreviousArtifacts := Set(organization.value %% name.value % "0.3.0"),
     Test / parallelExecution := false,

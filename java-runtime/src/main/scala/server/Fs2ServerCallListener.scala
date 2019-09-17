@@ -6,7 +6,7 @@ import cats.effect._
 import cats.effect.concurrent.Deferred
 import cats.implicits._
 import fs2.Stream
-import io.grpc.{Context, Metadata, Status, StatusException, StatusRuntimeException}
+import io.grpc.{Metadata, Status, StatusException, StatusRuntimeException}
 
 private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   def source: G[Request]
@@ -38,14 +38,8 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
       case ExitCase.Error(t)  => reportError(t)
     }
 
-    // It's important that we call 'Context.current()' at this point,
-    // since Context is stored in thread local storage,
-    // so we have to grab it while we are in the callback thread of gRPC
-    val initialCtx = Context.current().fork()
-    val context = Resource.make(F.delay(initialCtx.attach()))(previous => F.delay(initialCtx.detach(previous)))
-
     // Exceptions are reported by closing the call
-    F.runAsync(F.race(context.use(_ => bracketed), isCancelled.get))(_ => IO.unit).unsafeRunSync()
+    F.runAsync(F.race(bracketed, isCancelled.get))(_ => IO.unit).unsafeRunSync()
   }
 
   def unsafeUnaryResponse(headers: Metadata, implementation: G[Request] => F[Response])(

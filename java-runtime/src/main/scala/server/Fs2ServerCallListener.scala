@@ -42,10 +42,8 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
     // since Context is stored in thread local storage,
     // so we have to grab it while we are in the callback thread of gRPC
     val initialCtx = Context.current().fork()
-    val context = Resource.make(F.delay(initialCtx.attach()))(previous => F.delay(initialCtx.detach(previous)))
-
     // Exceptions are reported by closing the call
-    F.runAsync(F.race(context.use(_ => bracketed), isCancelled.get))(_ => IO.unit).unsafeRunSync()
+    F.runAsync(F.race(F.delay(initialCtx.attach()) >>= (_ => bracketed), isCancelled.get))(_ => IO.unit).unsafeRunSync()
   }
 
   def unsafeUnaryResponse(headers: Metadata, implementation: G[Request] => F[Response])(

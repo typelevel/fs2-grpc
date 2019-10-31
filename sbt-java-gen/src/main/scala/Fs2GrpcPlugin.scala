@@ -80,7 +80,7 @@ object Fs2Grpc extends AutoPlugin {
   override def trigger: PluginTrigger = NoTrigger
 
   override def projectSettings: Seq[Def.Setting[_]] = List(
-    PB.targets := scalapbCodeGenerators.value
+    Compile / PB.targets := scalapbCodeGenerators.value
   )
 }
 

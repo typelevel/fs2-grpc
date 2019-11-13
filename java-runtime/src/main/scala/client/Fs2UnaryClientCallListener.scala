@@ -2,14 +2,18 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package client
 
+import cats.implicits._
 import cats.effect._
 import cats.effect.concurrent.{Deferred, Ref}
-import cats.implicits._
-import io.grpc._
+import io.grpc.{ClientCall, Metadata, Status, StatusRuntimeException}
 
 class Fs2UnaryClientCallListener[F[_], Response](
   grpcStatus: Deferred[F, GrpcStatus],
-  value: Ref[F, Option[Response]])(implicit F: Effect[F]) extends ClientCall.Listener[Response] {
+  value: Ref[F, Option[Response]],
+  errorAdapter: StatusRuntimeException => Option[Exception]
+)(implicit F: Effect[F]) extends ClientCall.Listener[Response] {
+
+  import Fs2UnaryClientCallListener._
 
   override def onClose(status: Status, trailers: Metadata): Unit =
     grpcStatus.complete(GrpcStatus(status, trailers)).unsafeRun()
@@ -22,19 +26,11 @@ class Fs2UnaryClientCallListener[F[_], Response](
       r <- grpcStatus.get
       v <- value.get
       result <- {
-        if (!r.status.isOk)
-          F.raiseError(r.status.asRuntimeException(r.trailers))
-        else {
-          v match {
-            case None =>
-              F.raiseError(
-                Status.INTERNAL
-                  .withDescription("No value received for unary call")
-                  .asRuntimeException(r.trailers))
-            case Some(v1) =>
-              F.pure(v1)
-          }
-        }
+        if (!r.status.isOk) {
+          val str = r.status.asRuntimeException(r.trailers)
+          F.raiseError[Response](errorAdapter(str).getOrElse(str))
+        } else
+          v.fold(F.raiseError[Response](noValueReceivedError(r.trailers)))(F.pure)
       }
     } yield result
   }
@@ -42,9 +38,14 @@ class Fs2UnaryClientCallListener[F[_], Response](
 
 object Fs2UnaryClientCallListener {
 
-  def apply[F[_]: ConcurrentEffect, Response]: F[Fs2UnaryClientCallListener[F, Response]] = {
+  private val noValueReceivedError: Metadata => StatusRuntimeException =
+    md => Status.INTERNAL.withDescription("No value received for unary call").asRuntimeException(md)
+
+  def apply[F[_]: ConcurrentEffect, Response](
+    errorAdapter: StatusRuntimeException => Option[Exception]
+  ): F[Fs2UnaryClientCallListener[F, Response]] = {
     (Deferred[F, GrpcStatus], Ref.of[F, Option[Response]](none)).mapN((response, value) =>
-      new Fs2UnaryClientCallListener[F, Response](response, value)
+      new Fs2UnaryClientCallListener[F, Response](response, value, errorAdapter)
     )
   }
 

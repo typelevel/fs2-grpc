@@ -9,6 +9,6 @@ addSbtPlugin("com.timushev.sbt" % "sbt-updates"   % "0.5.0")
 
 addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.6.1")
 
-addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.8")
+addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.9")
 
 libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.9.6"

@@ -11,33 +11,40 @@ class Fs2ServerCallHandler[F[_]](val dummy: Boolean = false) extends AnyVal {
 
   def unaryToUnaryCall[Request, Response](
       implementation: (Request, Metadata) => F[Response],
-      options: ServerCallOptions = ServerCallOptions.default)(
-      implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
+      options: ServerCallOptions = ServerCallOptions.default
+  )(implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
         val listener = Fs2UnaryServerCallListener[F](call, options).unsafeRun()
-        listener.unsafeUnaryResponse(headers, _ flatMap { request => implementation(request, headers) })
+        listener.unsafeUnaryResponse(headers, _ flatMap { request =>
+          implementation(request, headers)
+        })
         listener
       }
     }
 
   def unaryToStreamingCall[Request, Response](
       implementation: (Request, Metadata) => Stream[F, Response],
-      options: ServerCallOptions = ServerCallOptions.default)(
-      implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
+      options: ServerCallOptions = ServerCallOptions.default
+  )(implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
         val listener = Fs2UnaryServerCallListener[F](call, options).unsafeRun()
         listener.unsafeStreamResponse(
-          new Metadata(), v => Stream.eval(v) flatMap { request => implementation(request, headers) })
+          new Metadata(),
+          v =>
+            Stream.eval(v) flatMap { request =>
+              implementation(request, headers)
+            }
+        )
         listener
       }
     }
 
   def streamingToUnaryCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => F[Response],
-      options: ServerCallOptions = ServerCallOptions.default)(
-      implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
+      options: ServerCallOptions = ServerCallOptions.default
+  )(implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
         val listener = Fs2StreamServerCallListener[F](call, options).unsafeRun()
@@ -48,8 +55,8 @@ class Fs2ServerCallHandler[F[_]](val dummy: Boolean = false) extends AnyVal {
 
   def streamingToStreamingCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => Stream[F, Response],
-      options: ServerCallOptions = ServerCallOptions.default)(
-      implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
+      options: ServerCallOptions = ServerCallOptions.default
+  )(implicit F: ConcurrentEffect[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
         val listener = Fs2StreamServerCallListener[F](call, options).unsafeRun()

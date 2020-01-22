@@ -18,14 +18,16 @@ sealed trait CodeGeneratorOption extends Product with Serializable
 
 class Fs2CodeGenerator(serviceSuffix: String) extends ProtocCodeGenerator {
 
-  def generateServiceFiles(file: FileDescriptor,
-                           di: DescriptorImplicits): Seq[PluginProtos.CodeGeneratorResponse.File] = {
+  def generateServiceFiles(
+      file: FileDescriptor,
+      di: DescriptorImplicits
+  ): Seq[PluginProtos.CodeGeneratorResponse.File] = {
     file.getServices.asScala.map { service =>
       val p = new Fs2GrpcServicePrinter(service, serviceSuffix, di)
 
       import di.{ServiceDescriptorPimp, FileDescriptorPimp}
       val code = p.printService(FunctionalPrinter()).result()
-      val b    = CodeGeneratorResponse.File.newBuilder()
+      val b = CodeGeneratorResponse.File.newBuilder()
       b.setName(file.scalaDirectory + "/" + service.name + s"$serviceSuffix.scala")
       b.setContent(code)
       println(b.getName)
@@ -47,8 +49,8 @@ class Fs2CodeGenerator(serviceSuffix: String) extends ProtocCodeGenerator {
             }
 
           val implicits = new DescriptorImplicits(params, filesByName.values.toVector)
-          val genFiles  = request.getFileToGenerateList.asScala.map(filesByName)
-          val srvFiles  = genFiles.flatMap(generateServiceFiles(_, implicits))
+          val genFiles = request.getFileToGenerateList.asScala.map(filesByName)
+          val srvFiles = genFiles.flatMap(generateServiceFiles(_, implicits))
           b.addAllFile(srvFiles.asJava)
         } catch {
           case e: GeneratorException =>
@@ -76,7 +78,7 @@ class Fs2CodeGenerator(serviceSuffix: String) extends ProtocCodeGenerator {
 }
 
 object Fs2Grpc extends AutoPlugin {
-  override def requires: Plugins      = Fs2GrpcPlugin
+  override def requires: Plugins = Fs2GrpcPlugin
   override def trigger: PluginTrigger = NoTrigger
 
   override def projectSettings: Seq[Def.Setting[_]] = List(
@@ -124,7 +126,7 @@ object Fs2GrpcPlugin extends AutoPlugin {
   import autoImport._
 
   override def requires = sbtprotoc.ProtocPlugin && JvmPlugin
-  override def trigger  = NoTrigger
+  override def trigger = NoTrigger
 
   def convertOptionsToScalapbGen(options: Set[CodeGeneratorOption]): (JvmGenerator, Seq[String]) = {
     scalapb.gen(
@@ -140,24 +142,27 @@ object Fs2GrpcPlugin extends AutoPlugin {
     fs2GrpcServiceSuffix := "Fs2Grpc",
     scalapbProtobufDirectory := (sourceManaged in Compile).value / "scalapb",
     scalapbCodeGenerators := {
-      Target(convertOptionsToScalapbGen(scalapbCodeGeneratorOptions.value.toSet),
-             (sourceManaged in Compile).value / "scalapb") ::
+      Target(
+        convertOptionsToScalapbGen(scalapbCodeGeneratorOptions.value.toSet),
+        (sourceManaged in Compile).value / "scalapb"
+      ) ::
         Option(
-        Target(
-          (JvmGenerator("scala-fs2-grpc", new Fs2CodeGenerator(fs2GrpcServiceSuffix.value)),
-           scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString)),
-          (sourceManaged in Compile).value / "fs2-grpc"
-        ))
-        .filter(_ => scalapbCodeGeneratorOptions.value.contains(CodeGeneratorOption.Fs2Grpc))
-        .toList
+          Target(
+            (
+              JvmGenerator("scala-fs2-grpc", new Fs2CodeGenerator(fs2GrpcServiceSuffix.value)),
+              scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString)
+            ),
+            (sourceManaged in Compile).value / "fs2-grpc"
+          )
+        ).filter(_ => scalapbCodeGeneratorOptions.value.contains(CodeGeneratorOption.Fs2Grpc)).toList
     },
     scalapbCodeGeneratorOptions := Seq(CodeGeneratorOption.Grpc, CodeGeneratorOption.Fs2Grpc),
     libraryDependencies ++= List(
-      "io.grpc"               % "grpc-core"             % scalapb.compiler.Version.grpcJavaVersion,
-      "io.grpc"               % "grpc-stub"             % scalapb.compiler.Version.grpcJavaVersion,
-      "org.lyranthe.fs2-grpc" %% "java-runtime"         % org.lyranthe.fs2_grpc.buildinfo.BuildInfo.version,
-      "com.thesamet.scalapb"  %% "scalapb-runtime"      % scalapb.compiler.Version.scalapbVersion,
-      "com.thesamet.scalapb"  %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+      "io.grpc" % "grpc-core" % scalapb.compiler.Version.grpcJavaVersion,
+      "io.grpc" % "grpc-stub" % scalapb.compiler.Version.grpcJavaVersion,
+      "org.lyranthe.fs2-grpc" %% "java-runtime" % org.lyranthe.fs2_grpc.buildinfo.BuildInfo.version,
+      "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
+      "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
     )
   )
 }

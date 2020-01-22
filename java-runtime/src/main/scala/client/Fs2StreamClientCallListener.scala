@@ -9,15 +9,14 @@ import fs2.concurrent.Queue
 import io.grpc.{ClientCall, Metadata, Status}
 
 class Fs2StreamClientCallListener[F[_]: Effect, Response](
-  request: Int => Unit, queue: Queue[F, Either[GrpcStatus, Response]]
+    request: Int => Unit,
+    queue: Queue[F, Either[GrpcStatus, Response]]
 ) extends ClientCall.Listener[Response] {
 
   override def onMessage(message: Response): Unit = {
     request(1)
     queue.enqueue1(message.asRight).unsafeRun()
   }
-
-
 
   override def onClose(status: Status, trailers: Metadata): Unit =
     queue.enqueue1(GrpcStatus(status, trailers).asLeft).unsafeRun()
@@ -43,6 +42,6 @@ class Fs2StreamClientCallListener[F[_]: Effect, Response](
 object Fs2StreamClientCallListener {
 
   def apply[F[_]: ConcurrentEffect, Response](request: Int => Unit): F[Fs2StreamClientCallListener[F, Response]] =
-      Queue.unbounded[F, Either[GrpcStatus, Response]].map(new Fs2StreamClientCallListener[F, Response](request, _))
+    Queue.unbounded[F, Either[GrpcStatus, Response]].map(new Fs2StreamClientCallListener[F, Response](request, _))
 
 }

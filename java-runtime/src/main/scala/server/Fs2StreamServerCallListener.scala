@@ -12,7 +12,8 @@ import fs2._
 class Fs2StreamServerCallListener[F[_], Request, Response] private (
     requestQ: Queue[F, Option[Request]],
     val isCancelled: Deferred[F, Unit],
-    val call: Fs2ServerCall[F, Request, Response])(implicit F: Effect[F])
+    val call: Fs2ServerCall[F, Request, Response]
+)(implicit F: Effect[F])
     extends ServerCall.Listener[Request]
     with Fs2ServerCallListener[F, Stream[F, ?], Request, Response] {
 
@@ -36,15 +37,15 @@ object Fs2StreamServerCallListener {
 
     def apply[Request, Response](
         call: ServerCall[Request, Response],
-        options: ServerCallOptions = ServerCallOptions.default)(
+        options: ServerCallOptions = ServerCallOptions.default
+    )(
         implicit F: ConcurrentEffect[F]
     ): F[Fs2StreamServerCallListener[F, Request, Response]] =
       for {
-        inputQ      <- Queue.unbounded[F, Option[Request]]
+        inputQ <- Queue.unbounded[F, Option[Request]]
         isCancelled <- Deferred[F, Unit]
-        serverCall  <- Fs2ServerCall[F, Request, Response](call, options)
-      } yield
-        new Fs2StreamServerCallListener[F, Request, Response](inputQ, isCancelled, serverCall)
+        serverCall <- Fs2ServerCall[F, Request, Response](call, options)
+      } yield new Fs2StreamServerCallListener[F, Request, Response](inputQ, isCancelled, serverCall)
   }
 
   def apply[F[_]] = new PartialFs2StreamServerCallListener[F]

@@ -45,8 +45,9 @@ final class ManagedChannelBuilderOps(val builder: ManagedChannelBuilder[_]) exte
     * channel, with respect to forceful vs. graceful shutdown and how to poll
     * or block for termination.
     */
-  def resourceWithShutdown[F[_]](shutdown: ManagedChannel => F[Unit])(
-      implicit F: Sync[F]): Resource[F, ManagedChannel] =
+  def resourceWithShutdown[F[_]](
+      shutdown: ManagedChannel => F[Unit]
+  )(implicit F: Sync[F]): Resource[F, ManagedChannel] =
     Resource.make(F.delay(builder.build()))(shutdown)
 
   /**

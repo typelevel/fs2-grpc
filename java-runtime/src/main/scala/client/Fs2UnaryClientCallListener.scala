@@ -7,9 +7,9 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 import io.grpc._
 
-class Fs2UnaryClientCallListener[F[_], Response](
-  grpcStatus: Deferred[F, GrpcStatus],
-  value: Ref[F, Option[Response]])(implicit F: Effect[F]) extends ClientCall.Listener[Response] {
+class Fs2UnaryClientCallListener[F[_], Response](grpcStatus: Deferred[F, GrpcStatus], value: Ref[F, Option[Response]])(
+    implicit F: Effect[F]
+) extends ClientCall.Listener[Response] {
 
   override def onClose(status: Status, trailers: Metadata): Unit =
     grpcStatus.complete(GrpcStatus(status, trailers)).unsafeRun()
@@ -18,7 +18,7 @@ class Fs2UnaryClientCallListener[F[_], Response](
     value.set(message.some).unsafeRun()
 
   def getValue: F[Response] = {
-     for {
+    for {
       r <- grpcStatus.get
       v <- value.get
       result <- {
@@ -30,7 +30,8 @@ class Fs2UnaryClientCallListener[F[_], Response](
               F.raiseError(
                 Status.INTERNAL
                   .withDescription("No value received for unary call")
-                  .asRuntimeException(r.trailers))
+                  .asRuntimeException(r.trailers)
+              )
             case Some(v1) =>
               F.pure(v1)
           }

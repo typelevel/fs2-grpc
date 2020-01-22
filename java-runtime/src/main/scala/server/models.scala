@@ -3,7 +3,7 @@ package java_runtime
 package server
 
 sealed abstract class ServerCompressor(val name: String) extends Product with Serializable
-case object GzipCompressor                               extends ServerCompressor("gzip")
+case object GzipCompressor extends ServerCompressor("gzip")
 
 abstract class ServerCallOptions private (val compressor: Option[ServerCompressor]) {
   def copy(compressor: Option[ServerCompressor] = this.compressor): ServerCallOptions =

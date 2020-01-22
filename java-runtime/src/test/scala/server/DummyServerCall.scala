@@ -5,7 +5,7 @@ import io.grpc.{Metadata, MethodDescriptor, ServerCall, Status}
 import scala.collection.mutable.ArrayBuffer
 
 class DummyServerCall extends ServerCall[String, Int] {
-  val messages: ArrayBuffer[Int]    = ArrayBuffer[Int]()
+  val messages: ArrayBuffer[Int] = ArrayBuffer[Int]()
   var currentStatus: Option[Status] = None
 
   override def request(numMessages: Int): Unit = ()

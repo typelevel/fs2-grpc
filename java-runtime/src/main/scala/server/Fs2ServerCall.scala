@@ -25,7 +25,8 @@ private[server] object Fs2ServerCall {
 
   def apply[F[_]: Sync, Request, Response](
       call: ServerCall[Request, Response],
-      options: ServerCallOptions): F[Fs2ServerCall[F, Request, Response]] =
+      options: ServerCallOptions
+  ): F[Fs2ServerCall[F, Request, Response]] =
     Sync[F]
       .delay(options.compressor.map(_.name).foreach(call.setCompression))
       .as(new Fs2ServerCall[F, Request, Response](call))

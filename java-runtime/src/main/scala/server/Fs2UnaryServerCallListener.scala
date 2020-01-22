@@ -11,7 +11,8 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
     request: Ref[F, Option[Request]],
     isComplete: Deferred[F, Unit],
     val isCancelled: Deferred[F, Unit],
-    val call: Fs2ServerCall[F, Request, Response])(implicit F: Effect[F])
+    val call: Fs2ServerCall[F, Request, Response]
+)(implicit F: Effect[F])
     extends ServerCall.Listener[Request]
     with Fs2ServerCallListener[F, F, Request, Response] {
 
@@ -39,16 +40,16 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
 
   override def source: F[Request] =
     for {
-      _           <- isComplete.get
+      _ <- isComplete.get
       valueOrNone <- request.get
-      value       <- valueOrNone.fold[F[Request]](F.raiseError(statusException(NoMessage)))(F.pure)
+      value <- valueOrNone.fold[F[Request]](F.raiseError(statusException(NoMessage)))(F.pure)
     } yield value
 }
 
 object Fs2UnaryServerCallListener {
 
   val TooManyRequests: String = "Too many requests"
-  val NoMessage: String       = "No message for unary call"
+  val NoMessage: String = "No message for unary call"
 
   private val statusException: String => StatusRuntimeException = msg =>
     new StatusRuntimeException(Status.INTERNAL.withDescription(msg))
@@ -57,16 +58,16 @@ object Fs2UnaryServerCallListener {
 
     def apply[Request, Response](
         call: ServerCall[Request, Response],
-        options: ServerCallOptions = ServerCallOptions.default)(
+        options: ServerCallOptions = ServerCallOptions.default
+    )(
         implicit F: ConcurrentEffect[F]
     ): F[Fs2UnaryServerCallListener[F, Request, Response]] =
       for {
-        request     <- Ref.of[F, Option[Request]](none)
-        isComplete  <- Deferred[F, Unit]
+        request <- Ref.of[F, Option[Request]](none)
+        isComplete <- Deferred[F, Unit]
         isCancelled <- Deferred[F, Unit]
-        serverCall  <- Fs2ServerCall[F, Request, Response](call, options)
-      } yield
-        new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall)
+        serverCall <- Fs2ServerCall[F, Request, Response](call, options)
+      } yield new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall)
   }
 
   def apply[F[_]] = new PartialFs2UnaryServerCallListener[F]

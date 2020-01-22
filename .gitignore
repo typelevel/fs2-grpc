@@ -3,3 +3,9 @@
 
 .idea/
 target/
+
+# Metals
+.metals/*
+.bloop/*
+project/.bloop/*
+project/metals.sbt

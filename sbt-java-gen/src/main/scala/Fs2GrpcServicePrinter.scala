@@ -10,7 +10,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] val serviceName: String = service.name
   private[this] val serviceNameFs2: String = s"$serviceName$serviceSuffix"
-  private[this] val servicePkgName: String = service.getFile.scalaPackageName
+  private[this] val servicePkgName: String = service.getFile.scalaPackage.fullName
 
   private[this] def serviceMethodSignature(method: MethodDescriptor) = {
 
@@ -37,7 +37,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def createClientCall(method: MethodDescriptor) = {
     val basicClientCall =
-      s"$Fs2ClientCall[F](channel, _root_.$servicePkgName.${serviceName}Grpc.${method.descriptorName}, c($CallOptions.DEFAULT), $ErrorAdapterName)"
+      s"$Fs2ClientCall[F](channel, ${method.grpcDescriptor.fullName}, c($CallOptions.DEFAULT), $ErrorAdapterName)"
     if (method.isServerStreaming)
       s"$Stream.eval($basicClientCall)"
     else
@@ -57,7 +57,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
   private[this] def serviceBindingImplementation(method: MethodDescriptor): PrinterEndo = { p =>
     val inType = method.inputType.scalaType
     val outType = method.outputType.scalaType
-    val descriptor = s"_root_.$servicePkgName.${serviceName}Grpc.${method.descriptorName}"
+    val descriptor = method.grpcDescriptor.fullName
     val handler = s"$Fs2ServerCallHandler[F].${handleMethod(method)}[$inType, $outType]"
 
     val serviceCall = s"serviceImpl.${method.name}"
@@ -73,7 +73,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceBindingImplementations: PrinterEndo =
     _.indent
-      .add(s".builder(_root_.$servicePkgName.${serviceName}Grpc.${service.descriptorName})")
+      .add(s".builder(${service.grpcDescriptor.fullName})")
       .call(service.methods.map(serviceBindingImplementation): _*)
       .add(".build()")
       .outdent

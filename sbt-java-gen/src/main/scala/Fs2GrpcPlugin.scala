@@ -13,6 +13,7 @@ import sbtprotoc.ProtocPlugin.autoImport.PB
 import scalapb.compiler.{FunctionalPrinter, GeneratorException, DescriptorImplicits, ProtobufGenerator}
 import scalapb.options.compiler.Scalapb
 import scala.collection.JavaConverters._
+import org.lyranthe.fs2_grpc.buildinfo.BuildInfo
 
 sealed trait CodeGeneratorOption extends Product with Serializable
 
@@ -158,9 +159,10 @@ object Fs2GrpcPlugin extends AutoPlugin {
     },
     scalapbCodeGeneratorOptions := Seq(CodeGeneratorOption.Grpc, CodeGeneratorOption.Fs2Grpc),
     libraryDependencies ++= List(
-      "io.grpc" % "grpc-core" % scalapb.compiler.Version.grpcJavaVersion,
-      "io.grpc" % "grpc-stub" % scalapb.compiler.Version.grpcJavaVersion,
-      "org.lyranthe.fs2-grpc" %% "java-runtime" % org.lyranthe.fs2_grpc.buildinfo.BuildInfo.version,
+      "io.grpc" % "grpc-core" % BuildInfo.grpcVersion,
+      "io.grpc" % "grpc-stub" % BuildInfo.grpcVersion,
+      "io.grpc" % "grpc-protobuf" % BuildInfo.grpcVersion,
+      BuildInfo.organization %% "java-runtime" % BuildInfo.version,
       "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
       "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
     )

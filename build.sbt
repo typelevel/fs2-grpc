@@ -11,7 +11,7 @@ inThisBuild(
 
 lazy val root = project
   .in(file("."))
-  .enablePlugins(GitVersioning, BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin)
   .settings(
     sonatypeProfileName := "org.lyranthe",
     skip in publish := true,
@@ -35,10 +35,9 @@ lazy val root = project
   .aggregate(`sbt-java-gen`, `java-runtime`)
 
 lazy val `sbt-java-gen` = project
-  .enablePlugins(GitVersioning, BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin)
   .settings(
     scalaVersion := "2.12.10",
-    publishTo := sonatypePublishToBundle.value,
     sbtPlugin := true,
     crossSbtVersions := List(sbtVersion.value),
     buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
@@ -55,11 +54,9 @@ lazy val `sbt-java-gen` = project
   )
 
 lazy val `java-runtime` = project
-  .enablePlugins(GitVersioning)
   .settings(
     scalaVersion := "2.13.1",
     crossScalaVersions := List(scalaVersion.value, "2.12.10"),
-    publishTo := sonatypePublishToBundle.value,
     libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, catsEffectLaws, minitest).map(_ % Test),
     mimaPreviousArtifacts := Set(organization.value %% name.value % "0.3.0"),
     Test / parallelExecution := false,

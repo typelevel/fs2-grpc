@@ -19,7 +19,7 @@ object Dependencies {
 
   val fs2 = "co.fs2" %% "fs2-core" % versions.fs2
   val catsEffect = "org.typelevel" %% "cats-effect" % versions.catsEffect
-  val grpcCore = "io.grpc" % "grpc-core" % versions.grpc
+  val grpcApi = "io.grpc" % "grpc-api" % versions.grpc
 
   // Testing
 

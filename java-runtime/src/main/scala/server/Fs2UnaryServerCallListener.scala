@@ -59,8 +59,8 @@ object Fs2UnaryServerCallListener {
     def apply[Request, Response](
         call: ServerCall[Request, Response],
         options: ServerCallOptions = ServerCallOptions.default
-    )(
-        implicit F: ConcurrentEffect[F]
+    )(implicit
+        F: ConcurrentEffect[F]
     ): F[Fs2UnaryServerCallListener[F, Request, Response]] =
       for {
         request <- Ref.of[F, Option[Request]](none)

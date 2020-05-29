@@ -34,8 +34,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   private def start(listener: ClientCall.Listener[Response], metadata: Metadata)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.start(listener, metadata))
 
-  def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], headers: Metadata)(
-      implicit F: Sync[F]
+  def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], headers: Metadata)(implicit
+      F: Sync[F]
   ): F[A] =
     createListener.flatTap(start(_, headers)) <* request(1)
 
@@ -56,8 +56,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       sendSingleMessage(message) *> l.getValue.adaptError(ea)
     )(handleCallError)
 
-  def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata)(
-      implicit F: ConcurrentEffect[F]
+  def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata)(implicit
+      F: ConcurrentEffect[F]
   ): F[Response] =
     F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers))(l =>
       Stream.eval(l.getValue.adaptError(ea)).concurrently(sendStream(messages)).compile.lastOrError
@@ -68,8 +68,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleCallError)
       .flatMap(Stream.eval_(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
 
-  def streamingToStreamingCall(messages: Stream[F, Request], headers: Metadata)(
-      implicit F: ConcurrentEffect[F]
+  def streamingToStreamingCall(messages: Stream[F, Request], headers: Metadata)(implicit
+      F: ConcurrentEffect[F]
   ): Stream[F, Response] =
     Stream
       .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleCallError)

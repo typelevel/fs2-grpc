@@ -42,13 +42,13 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
     F.runAsync(F.race(bracketed, isCancelled.get))(_ => IO.unit).unsafeRunSync()
   }
 
-  def unsafeUnaryResponse(headers: Metadata, implementation: G[Request] => F[Response])(
-      implicit F: ConcurrentEffect[F]
+  def unsafeUnaryResponse(headers: Metadata, implementation: G[Request] => F[Response])(implicit
+      F: ConcurrentEffect[F]
   ): Unit =
     unsafeRun(handleUnaryResponse(headers, implementation(source)))
 
-  def unsafeStreamResponse(headers: Metadata, implementation: G[Request] => Stream[F, Response])(
-      implicit F: ConcurrentEffect[F]
+  def unsafeStreamResponse(headers: Metadata, implementation: G[Request] => Stream[F, Response])(implicit
+      F: ConcurrentEffect[F]
   ): Unit =
     unsafeRun(handleStreamResponse(headers, implementation(source)))
 }

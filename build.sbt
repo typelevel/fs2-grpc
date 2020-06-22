@@ -32,7 +32,15 @@ lazy val root = project
         </developers>
     }
   )
-  .aggregate(`sbt-java-gen`, `java-runtime`)
+  .aggregate(`java-gen`, `sbt-java-gen`, `java-runtime`)
+
+lazy val `java-gen` = project
+  .enablePlugins(GitVersioning)
+  .settings(
+    scalaVersion := "2.12.11",
+    publishTo := sonatypePublishToBundle.value,
+    libraryDependencies += scalaPbCompiler
+  )
 
 lazy val `sbt-java-gen` = project
   .enablePlugins(GitVersioning, BuildInfoPlugin)
@@ -48,10 +56,11 @@ lazy val `sbt-java-gen` = project
       scalaVersion,
       sbtVersion,
       organization,
-      "grpcVersion" -> versions.grpc
+      "grpcVersion" -> versions.grpc,
+      "codeGeneratorName" -> (name in `java-gen`).value
     ),
-    addSbtPlugin(sbtProtoc),
-    libraryDependencies += scalaPbCompiler
+    libraryDependencies += scalaPbCompiler,
+    addSbtPlugin(sbtProtoc)
   )
 
 lazy val `java-runtime` = project

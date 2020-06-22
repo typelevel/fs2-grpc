@@ -5,43 +5,57 @@ import com.google.protobuf.ExtensionRegistry
 import com.google.protobuf.compiler.PluginProtos
 import com.google.protobuf.compiler.PluginProtos.{CodeGeneratorRequest, CodeGeneratorResponse}
 import org.lyranthe.fs2_grpc.java_runtime.sbt_gen.Fs2GrpcPlugin.autoImport.scalapbCodeGenerators
-import protocbridge.{Artifact, JvmGenerator, ProtocCodeGenerator, Target}
+import protocbridge.{Artifact, Generator, ProtocCodeGenerator, SandboxedJvmGenerator, Target}
 import sbt._
 import sbt.Keys._
 import sbt.plugins.JvmPlugin
 import sbtprotoc.ProtocPlugin.autoImport.PB
-import scalapb.compiler.{FunctionalPrinter, GeneratorException, DescriptorImplicits, ProtobufGenerator}
+import scalapb.compiler.{FunctionalPrinter, GeneratorException, DescriptorImplicits, GeneratorParams}
 import scalapb.options.compiler.Scalapb
 import scala.collection.JavaConverters._
 import org.lyranthe.fs2_grpc.buildinfo.BuildInfo
 
 sealed trait CodeGeneratorOption extends Product with Serializable
 
-class Fs2CodeGenerator(serviceSuffix: String) extends ProtocCodeGenerator {
+case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
+
+object Fs2CodeGenerator extends ProtocCodeGenerator {
 
   def generateServiceFiles(
       file: FileDescriptor,
+      fs2params: Fs2Params,
       di: DescriptorImplicits
   ): Seq[PluginProtos.CodeGeneratorResponse.File] = {
     file.getServices.asScala.map { service =>
-      val p = new Fs2GrpcServicePrinter(service, serviceSuffix, di)
+      val p = new Fs2GrpcServicePrinter(service, fs2params.serviceSuffix, di)
 
       import di.{ServiceDescriptorPimp, FileDescriptorPimp}
       val code = p.printService(FunctionalPrinter()).result()
       val b = CodeGeneratorResponse.File.newBuilder()
-      b.setName(file.scalaDirectory + "/" + service.name + s"$serviceSuffix.scala")
+      b.setName(file.scalaDirectory + "/" + service.name + s"${fs2params.serviceSuffix}.scala")
       b.setContent(code)
       println(b.getName)
       b.build
     }
   }
 
+  private def parseParameters(params: String): Either[String, (GeneratorParams, Fs2Params)] =
+    for {
+      paramsAndUnparsed <- GeneratorParams.fromStringCollectUnrecognized(params)
+      params = paramsAndUnparsed._1
+      unparsed = paramsAndUnparsed._2
+      suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(Fs2Params())) {
+        case (Right(params), ServiceSuffix :: suffix :: Nil) => Right(params.copy(serviceSuffix = suffix))
+        case (Right(_), xs) => Left(s"Unrecognized parameter: $xs")
+        case (Left(e), _) => Left(e)
+      }
+    } yield (params, suffix)
+
   def handleCodeGeneratorRequest(request: PluginProtos.CodeGeneratorRequest): PluginProtos.CodeGeneratorResponse = {
     val b = CodeGeneratorResponse.newBuilder
-    ProtobufGenerator.parseParameters(request.getParameter) match {
-      case Right(params) =>
+    parseParameters(request.getParameter()) match {
+      case Right((params, fs2params)) =>
         try {
-
           val filesByName: Map[String, FileDescriptor] =
             request.getProtoFileList.asScala.foldLeft[Map[String, FileDescriptor]](Map.empty) {
               case (acc, fp) =>
@@ -51,7 +65,7 @@ class Fs2CodeGenerator(serviceSuffix: String) extends ProtocCodeGenerator {
 
           val implicits = new DescriptorImplicits(params, filesByName.values.toVector)
           val genFiles = request.getFileToGenerateList.asScala.map(filesByName)
-          val srvFiles = genFiles.flatMap(generateServiceFiles(_, implicits))
+          val srvFiles = genFiles.flatMap(generateServiceFiles(_, fs2params, implicits))
           b.addAllFile(srvFiles.asJava)
         } catch {
           case e: GeneratorException =>
@@ -73,10 +87,7 @@ class Fs2CodeGenerator(serviceSuffix: String) extends ProtocCodeGenerator {
     handleCodeGeneratorRequest(request).toByteArray
   }
 
-  override def suggestedDependencies: Seq[Artifact] =
-    Seq(
-      Artifact("com.thesamet.scalapb", "scalapb-runtime", scalapb.compiler.Version.scalapbVersion, crossVersion = true)
-    )
+  private[fs2_grpc] val ServiceSuffix: String = "serviceSuffix"
 }
 
 object Fs2Grpc extends AutoPlugin {
@@ -124,14 +135,13 @@ object Fs2GrpcPlugin extends AutoPlugin {
       settingKey[String](
         "Suffix used for generated service, e.g. service `Foo` with suffix `Fs2Grpc` results in `FooFs2Grpc`"
       )
-
   }
   import autoImport._
 
   override def requires = sbtprotoc.ProtocPlugin && JvmPlugin
   override def trigger = NoTrigger
 
-  def convertOptionsToScalapbGen(options: Set[CodeGeneratorOption]): (JvmGenerator, Seq[String]) = {
+  def convertOptionsToScalapbGen(options: Set[CodeGeneratorOption]): (Generator, Seq[String]) = {
     scalapb.gen(
       flatPackage = options(CodeGeneratorOption.FlatPackage),
       javaConversions = options(CodeGeneratorOption.JavaConversions),
@@ -153,13 +163,24 @@ object Fs2GrpcPlugin extends AutoPlugin {
           Option(
             Target(
               (
-                JvmGenerator("scala-fs2-grpc", new Fs2CodeGenerator(fs2GrpcServiceSuffix.value)),
-                scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString)
+                SandboxedJvmGenerator.forModule(
+                  "scala-fs2-grpc",
+                  Artifact(BuildInfo.organization, BuildInfo.name, BuildInfo.version)
+                    .asSbtPlugin(
+                      CrossVersion.binaryScalaVersion(BuildInfo.scalaVersion),
+                      (sbtBinaryVersion in pluginCrossBuild).value
+                    ),
+                  "org.lyranthe.fs2_grpc.java_runtime.sbt_gen.Fs2CodeGenerator$",
+                  Nil
+                ),
+                scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString) :+
+                  s"${Fs2CodeGenerator.ServiceSuffix}=${fs2GrpcServiceSuffix.value}"
               ),
               (sourceManaged in Compile).value / "fs2-grpc"
             )
           ).filter(_ => scalapbCodeGeneratorOptions.value.contains(CodeGeneratorOption.Fs2Grpc)).toList
       },
+      resolvers += Resolver.sbtPluginRepo("releases"),
       scalapbCodeGeneratorOptions := Seq(CodeGeneratorOption.Grpc, CodeGeneratorOption.Fs2Grpc),
       libraryDependencies ++= List(
         "io.grpc" % "grpc-core" % BuildInfo.grpcVersion,

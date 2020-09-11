@@ -103,6 +103,9 @@ object Fs2GrpcPlugin extends AutoPlugin {
           ).filter(_ => scalapbCodeGeneratorOptions.value.contains(CodeGeneratorOption.Fs2Grpc)).toList
       },
       scalapbCodeGeneratorOptions := Seq(CodeGeneratorOption.Grpc, CodeGeneratorOption.Fs2Grpc),
+      Compile / unmanagedResourceDirectories += (Compile / sourceDirectory).value / "protobuf", // adds `.proto` files to the JAR, necessary to reference given `.proto` downstram
+      Compile / unmanagedSourceDirectories += (Compile / sourceDirectory).value / "protobuf", // hints to IDEs (IntelliJ, ...) that these are sources too => code highlighting, indexing, navigation, ...
+      Test / unmanagedSourceDirectories += (Test / sourceDirectory).value / "protobuf", // hints to IDEs (IntelliJ, ...) that these are sources too => code highlighting, indexing, navigation, ...
       libraryDependencies ++= List(
         "io.grpc" % "grpc-core" % BuildInfo.grpcVersion,
         "io.grpc" % "grpc-stub" % BuildInfo.grpcVersion,

@@ -7,5 +7,6 @@ target/
 # Metals
 .metals/*
 .bloop/*
-project/.bloop/*
-project/metals.sbt
+.vscode/*
+**/.bloop/*
+**/metals.sbt

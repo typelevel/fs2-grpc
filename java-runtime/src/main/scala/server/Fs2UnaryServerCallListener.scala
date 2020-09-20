@@ -24,12 +24,11 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
 
   override def onMessage(message: Request): Unit = {
     request.access
-      .flatMap[Unit] {
-        case (curValue, modify) =>
-          if (curValue.isDefined)
-            F.raiseError(statusException(TooManyRequests))
-          else
-            modify(message.some).void
+      .flatMap[Unit] { case (curValue, modify) =>
+        if (curValue.isDefined)
+          F.raiseError(statusException(TooManyRequests))
+        else
+          modify(message.some).void
       }
       .unsafeRun()
 

@@ -49,10 +49,9 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
       case Right((params, fs2params)) =>
         try {
           val filesByName: Map[String, FileDescriptor] =
-            request.getProtoFileList.asScala.foldLeft[Map[String, FileDescriptor]](Map.empty) {
-              case (acc, fp) =>
-                val deps = fp.getDependencyList.asScala.map(acc)
-                acc + (fp.getName -> FileDescriptor.buildFrom(fp, deps.toArray))
+            request.getProtoFileList.asScala.foldLeft[Map[String, FileDescriptor]](Map.empty) { case (acc, fp) =>
+              val deps = fp.getDependencyList.asScala.map(acc)
+              acc + (fp.getName -> FileDescriptor.buildFrom(fp, deps.toArray))
             }
 
           val implicits = new DescriptorImplicits(params, filesByName.values.toVector)

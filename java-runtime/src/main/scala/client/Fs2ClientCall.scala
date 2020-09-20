@@ -15,8 +15,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     errorAdapter: StatusRuntimeException => Option[Exception]
 ) {
 
-  private val ea: PartialFunction[Throwable, Throwable] = {
-    case e: StatusRuntimeException => errorAdapter(e).getOrElse(e)
+  private val ea: PartialFunction[Throwable, Throwable] = { case e: StatusRuntimeException =>
+    errorAdapter(e).getOrElse(e)
   }
 
   private def cancel(message: Option[String], cause: Option[Throwable])(implicit F: Sync[F]): F[Unit] =

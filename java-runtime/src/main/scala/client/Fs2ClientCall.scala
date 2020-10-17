@@ -2,8 +2,9 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package client
 
-import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
+import cats.effect.{Async, Resource}
+import cats.effect.std.Dispatcher
 import io.grpc.{Metadata, _}
 import fs2._
 
@@ -12,68 +13,82 @@ final case class GrpcStatus(status: Status, trailers: Metadata)
 
 class Fs2ClientCall[F[_], Request, Response] private[client] (
     call: ClientCall[Request, Response],
+    runner: UnsafeRunner[F],
     errorAdapter: StatusRuntimeException => Option[Exception]
-) {
+)(implicit F: Async[F]) {
 
   private val ea: PartialFunction[Throwable, Throwable] = { case e: StatusRuntimeException =>
     errorAdapter(e).getOrElse(e)
   }
 
-  private def cancel(message: Option[String], cause: Option[Throwable])(implicit F: Sync[F]): F[Unit] =
+  private def cancel(message: Option[String], cause: Option[Throwable]): F[Unit] =
     F.delay(call.cancel(message.orNull, cause.orNull))
 
-  private def halfClose(implicit F: Sync[F]): F[Unit] =
+  private val halfClose: F[Unit] =
     F.delay(call.halfClose())
 
-  private def request(numMessages: Int)(implicit F: Sync[F]): F[Unit] =
-    F.delay(call.request(numMessages))
+  private val requestOne: F[Unit] =
+    F.delay(call.request(1))
 
-  private def sendMessage(message: Request)(implicit F: Sync[F]): F[Unit] =
+  private def sendMessage(message: Request): F[Unit] =
     F.delay(call.sendMessage(message))
 
-  private def start(listener: ClientCall.Listener[Response], metadata: Metadata)(implicit F: Sync[F]): F[Unit] =
-    F.delay(call.start(listener, metadata))
+  private def start(listener: ClientCall.Listener[Response], md: Metadata): F[Unit] =
+    F.delay(call.start(listener, md))
 
-  def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], headers: Metadata)(implicit
-      F: Sync[F]
-  ): F[A] =
-    createListener.flatTap(start(_, headers)) <* request(1)
+  private def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], md: Metadata): F[A] =
+    createListener.flatTap(start(_, md)) <* requestOne
 
-  def sendSingleMessage(message: Request)(implicit F: Sync[F]): F[Unit] =
+  private def sendSingleMessage(message: Request): F[Unit] =
     sendMessage(message) *> halfClose
 
-  def sendStream(stream: Stream[F, Request])(implicit F: Sync[F]): Stream[F, Unit] =
+  private def sendStream(stream: Stream[F, Request]): Stream[F, Unit] =
     stream.evalMap(sendMessage) ++ Stream.eval(halfClose)
 
-  def handleCallError(implicit F: Sync[F]): (ClientCall.Listener[Response], ExitCase[Throwable]) => F[Unit] = {
-    case (_, ExitCase.Completed) => F.unit
-    case (_, ExitCase.Canceled) => cancel("call was cancelled".some, None)
-    case (_, ExitCase.Error(t)) => cancel(t.getMessage.some, t.some)
+  ///
+
+  def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
+    Stream
+      .resource(mkClientListenerR(headers))
+      .evalMap(sendSingleMessage(message) *> _.getValue.adaptError(ea))
+      .compile
+      .lastOrError
+
+  def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
+    Stream
+      .resource(mkClientListenerR(headers))
+      .flatMap(l => Stream.eval(l.getValue.adaptError(ea)).concurrently(sendStream(messages)))
+      .compile
+      .lastOrError
+
+  def unaryToStreamingCall(message: Request, md: Metadata): Stream[F, Response] =
+    Stream
+      .resource(mkStreamListenerR(md))
+      .flatMap(Stream.exec(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
+
+  def streamingToStreamingCall(messages: Stream[F, Request], md: Metadata): Stream[F, Response] =
+    Stream
+      .resource(mkStreamListenerR(md))
+      .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))
+
+  ///
+
+  private def handleCallError: (ClientCall.Listener[Response], Resource.ExitCase) => F[Unit] = {
+    case (_, Resource.ExitCase.Succeeded) => F.unit
+    case (_, Resource.ExitCase.Canceled) => cancel("call was cancelled".some, None)
+    case (_, Resource.ExitCase.Errored(t)) => cancel(t.getMessage.some, t.some)
   }
 
-  def unaryToUnaryCall(message: Request, headers: Metadata)(implicit F: ConcurrentEffect[F]): F[Response] =
-    F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers))(l =>
-      sendSingleMessage(message) *> l.getValue.adaptError(ea)
+  private def mkClientListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] =
+    Resource.makeCase(
+      startListener(Fs2UnaryClientCallListener[F, Response](runner), md)
     )(handleCallError)
 
-  def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata)(implicit
-      F: ConcurrentEffect[F]
-  ): F[Response] =
-    F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers))(l =>
-      Stream.eval(l.getValue.adaptError(ea)).concurrently(sendStream(messages)).compile.lastOrError
+  private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] =
+    Resource.makeCase(
+      startListener(Fs2StreamClientCallListener[F, Response](call.request(_), runner), md)
     )(handleCallError)
 
-  def unaryToStreamingCall(message: Request, headers: Metadata)(implicit F: ConcurrentEffect[F]): Stream[F, Response] =
-    Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleCallError)
-      .flatMap(Stream.eval_(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
-
-  def streamingToStreamingCall(messages: Stream[F, Request], headers: Metadata)(implicit
-      F: ConcurrentEffect[F]
-  ): Stream[F, Response] =
-    Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleCallError)
-      .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))
 }
 
 object Fs2ClientCall {
@@ -86,9 +101,16 @@ object Fs2ClientCall {
         channel: Channel,
         methodDescriptor: MethodDescriptor[Request, Response],
         callOptions: CallOptions,
-        errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
-    )(implicit F: Sync[F]): F[Fs2ClientCall[F, Request, Response]] = {
-      F.delay(new Fs2ClientCall(channel.newCall[Request, Response](methodDescriptor, callOptions), errorAdapter))
+        dispatcher: Dispatcher[F],
+        errorAdapter: StatusRuntimeException => Option[Exception]
+    )(implicit F: Async[F]): F[Fs2ClientCall[F, Request, Response]] = {
+      F.delay(
+        new Fs2ClientCall(
+          channel.newCall[Request, Response](methodDescriptor, callOptions),
+          UnsafeRunner[F](dispatcher),
+          errorAdapter
+        )
+      )
     }
 
   }

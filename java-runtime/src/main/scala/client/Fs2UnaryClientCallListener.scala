@@ -2,20 +2,25 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package client
 
+import cats.MonadError
 import cats.effect._
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.std.Dispatcher
 import cats.implicits._
 import io.grpc._
 
-class Fs2UnaryClientCallListener[F[_], Response](grpcStatus: Deferred[F, GrpcStatus], value: Ref[F, Option[Response]])(
-    implicit F: Effect[F]
-) extends ClientCall.Listener[Response] {
+class Fs2UnaryClientCallListener[F[_], Response] private (
+    grpcStatus: Deferred[F, GrpcStatus],
+    value: Ref[F, Option[Response]],
+    runner: UnsafeRunner[F]
+)(implicit F: MonadError[F, Throwable])
+    extends ClientCall.Listener[Response] {
 
   override def onClose(status: Status, trailers: Metadata): Unit =
-    grpcStatus.complete(GrpcStatus(status, trailers)).unsafeRun()
+    runner.unsafeRunSync(grpcStatus.complete(GrpcStatus(status, trailers)).void)
 
   override def onMessage(message: Response): Unit =
-    value.set(message.some).unsafeRun()
+    runner.unsafeRunSync(value.set(message.some).void)
 
   def getValue: F[Response] = {
     for {
@@ -43,10 +48,13 @@ class Fs2UnaryClientCallListener[F[_], Response](grpcStatus: Deferred[F, GrpcSta
 
 object Fs2UnaryClientCallListener {
 
-  def apply[F[_]: ConcurrentEffect, Response]: F[Fs2UnaryClientCallListener[F, Response]] = {
-    (Deferred[F, GrpcStatus], Ref.of[F, Option[Response]](none)).mapN((response, value) =>
-      new Fs2UnaryClientCallListener[F, Response](response, value)
-    )
-  }
+  def apply[F[_]: Async, Response](dispatcher: Dispatcher[F]): F[Fs2UnaryClientCallListener[F, Response]] =
+    apply[F, Response](UnsafeRunner[F](dispatcher))
 
+  private[client] def apply[F[_]: Async, Response](
+      runner: UnsafeRunner[F]
+  ): F[Fs2UnaryClientCallListener[F, Response]] =
+    (Deferred[F, GrpcStatus], Ref.of[F, Option[Response]](none)).mapN((response, value) =>
+      new Fs2UnaryClientCallListener[F, Response](response, value, runner)
+    )
 }

@@ -37,7 +37,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def createClientCall(method: MethodDescriptor) = {
     val basicClientCall =
-      s"$Fs2ClientCall[F](channel, ${method.grpcDescriptor.fullName}, c($CallOptions.DEFAULT), $ErrorAdapterName)"
+      s"$Fs2ClientCall[F](channel, ${method.grpcDescriptor.fullName}, $CallOptionsFnName($CallOptions.DEFAULT), dispatcher, $ErrorAdapterName)"
     if (method.isServerStreaming)
       s"$Stream.eval($basicClientCall)"
     else
@@ -58,7 +58,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     val inType = method.inputType.scalaType
     val outType = method.outputType.scalaType
     val descriptor = method.grpcDescriptor.fullName
-    val handler = s"$Fs2ServerCallHandler[F].${handleMethod(method)}[$inType, $outType]"
+    val handler = s"$Fs2ServerCallHandler[F](dispatcher).${handleMethod(method)}[$inType, $outType]"
 
     val serviceCall = s"serviceImpl.${method.name}"
     val eval = if (method.isServerStreaming) s"$Stream.eval(g(m))" else "g(m)"
@@ -95,8 +95,15 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceClient: PrinterEndo = {
     _.add(
-      s"def client[F[_]: $ConcurrentEffect, $Ctx](channel: $Channel, f: $Ctx => $Metadata, c: $CallOptions => $CallOptions = identity, $ErrorAdapterDefault): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
+      s"def client[F[_]: $Async, $Ctx](channel: $Channel, f: $Ctx => $Metadata, $CallOptionsFnDefault, $ErrorAdapterDefault): $Resource[F, $serviceNameFs2[F, $Ctx]] ="
     ).indent
+      .add(s"$Dispatcher[F].map(client0[F, $Ctx](_, channel, f, $CallOptionsFnName, $ErrorAdapterName))")
+      .newline
+      .outdent
+      .add(
+        s"def client0[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, f: $Ctx => $Metadata, $CallOptionsFnDefault, $ErrorAdapterDefault): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
+      )
+      .indent
       .call(serviceMethodImplementations)
       .outdent
       .add("}")
@@ -104,15 +111,23 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceBinding: PrinterEndo = {
     _.add(
-      s"def service[F[_]: $ConcurrentEffect, $Ctx](serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => Either[$Error, $Ctx]): $ServerServiceDefinition = {"
-    ).indent.newline
+      s"def service[F[_]: $Async, $Ctx](serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => Either[$Error, $Ctx]): $Resource[F, $ServerServiceDefinition] ="
+    ).indent
+      .add(s"$Dispatcher[F].map(service0[F, $Ctx](_, serviceImpl, f))")
+      .newline
+      .outdent
+      .add(
+        s"def service0[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => Either[$Error, $Ctx]): $ServerServiceDefinition = {"
+      )
+      .indent
+      .newline
       .add(
         s"val g: $Metadata => F[$Ctx] = f(_).leftMap[Throwable]($FailedPrecondition.withDescription(_).asRuntimeException()).liftTo[F]"
       )
       .newline
+      .indent
       .add(s"$ServerServiceDefinition")
       .call(serviceBindingImplementations)
-      .outdent
       .add("}")
   }
 
@@ -120,26 +135,38 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceClientMeta: PrinterEndo =
     _.add(
-      s"def stub[F[_]: $ConcurrentEffect](channel: $Channel, callOptions: $CallOptions = $CallOptions.DEFAULT, $ErrorAdapterDefault): $serviceNameFs2[F, $Metadata] = {"
+      s"def stub[F[_]: $Async](channel: $Channel, callOptions: $CallOptions = $CallOptions.DEFAULT, $ErrorAdapterDefault): $Resource[F, $serviceNameFs2[F, $Metadata]] ="
     ).indent
       .add(s"client[F, $Metadata](channel, identity, _ => callOptions, $ErrorAdapterName)")
       .outdent
-      .add("}")
+      .newline
+      .add(
+        s"def stub0[F[_]: $Async](dispatcher: $Dispatcher[F], channel: $Channel, callOptions: $CallOptions = $CallOptions.DEFAULT, $ErrorAdapterDefault): $serviceNameFs2[F, $Metadata] ="
+      )
+      .indent
+      .add(s"client0[F, $Metadata](dispatcher, channel, identity, _ => callOptions, $ErrorAdapterName)")
+      .outdent
 
   private[this] def serviceBindingMeta: PrinterEndo = {
     _.add(
-      s"def bindService[F[_]: $ConcurrentEffect](serviceImpl: $serviceNameFs2[F, $Metadata]): $ServerServiceDefinition = {"
+      s"def bindService[F[_]: $Async](serviceImpl: $serviceNameFs2[F, $Metadata]): $Resource[F, $ServerServiceDefinition] ="
     ).indent
       .add(s"service[F, $Metadata](serviceImpl, _.asRight[$Error])")
       .outdent
-      .add("}")
+      .newline
+      .add(
+        s"def bindService0[F[_]: $Async](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Metadata]): $ServerServiceDefinition ="
+      )
+      .indent
+      .add(s"service0[F, $Metadata](dispatcher, serviceImpl, _.asRight[$Error])")
+      .outdent
   }
 
   ///
 
   def printService(printer: FunctionalPrinter): FunctionalPrinter = {
     printer
-      .add(s"package $servicePkgName", "", "import _root_.cats.implicits._", "")
+      .add(s"package $servicePkgName", "", "import _root_.cats.syntax.all._", "")
       .call(serviceTrait)
       .newline
       .call(serviceObject)
@@ -160,7 +187,9 @@ object Fs2GrpcServicePrinter {
     val Error = "String"
     val Ctx = "A"
 
-    val ConcurrentEffect = s"$effPkg.ConcurrentEffect"
+    val Async = s"$effPkg.Async"
+    val Resource = s"$effPkg.Resource"
+    val Dispatcher = s"$effPkg.std.Dispatcher"
     val Stream = s"$fs2Pkg.Stream"
 
     val Fs2ServerCallHandler = s"$jrtPkg.server.Fs2ServerCallHandler"
@@ -172,6 +201,8 @@ object Fs2GrpcServicePrinter {
 
     val ServerServiceDefinition = s"$grpcPkg.ServerServiceDefinition"
     val CallOptions = s"$grpcPkg.CallOptions"
+    val CallOptionsFnName = "coFn"
+    val CallOptionsFnDefault = s"$CallOptionsFnName: $CallOptions => $CallOptions = identity"
     val Channel = s"$grpcPkg.Channel"
     val Metadata = s"$grpcPkg.Metadata"
     val FailedPrecondition = s"$grpcPkg.Status.FAILED_PRECONDITION"

@@ -2,33 +2,27 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package client
 
-import cats.implicits._
-import cats.effect.{ContextShift, IO, Timer}
-import cats.effect.laws.util.TestContext
+import scala.concurrent.duration._
+import scala.concurrent.TimeoutException
+import scala.util.Success
+import cats.effect._
 import fs2._
 import io.grpc._
-import minitest._
-import scala.concurrent.TimeoutException
-import scala.concurrent.duration._
-import scala.util.Success
 
-object ClientSuite extends SimpleTestSuite {
+class ClientSuite extends Fs2GrpcSuite {
 
-  def fs2ClientCall(dummy: DummyClientCall) =
-    new Fs2ClientCall[IO, String, Int](dummy, _ => None)
+  private def fs2ClientCall(dummy: DummyClientCall, ur: UnsafeRunner[IO]) =
+    new Fs2ClientCall[IO, String, Int](dummy, ur, _ => None)
 
-  test("single message to unaryToUnary") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("single message to unaryToUnary") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()
+    val client = fs2ClientCall(dummy, ur)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(r)
+
+    ec.tick()
     dummy.listener.get.onMessage(5)
 
     // Check that call does not complete after result returns
-    ec.tick()
     assertEquals(result.value, None)
 
     dummy.listener.get.onClose(Status.OK, new Metadata())
@@ -38,17 +32,13 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 1)
+
   }
 
-  test("cancellation for unaryToUnary") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-    implicit val timer: Timer[IO] = ec.timer
-
+  runTest0("cancellation for unaryToUnary") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).timeout(1.second).unsafeToFuture()
+    val client = fs2ClientCall(dummy, ur)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).timeout(1.second).unsafeToFuture()(r)
 
     ec.tick()
     dummy.listener.get.onMessage(5)
@@ -63,17 +53,15 @@ object ClientSuite extends SimpleTestSuite {
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[TimeoutException])
     assertEquals(dummy.cancelled.isDefined, true)
+
   }
 
-  test("no response message to unaryToUnary") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("no response message to unaryToUnary") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()
+    val client = fs2ClientCall(dummy, ur)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(r)
 
+    ec.tick()
     dummy.listener.get.onClose(Status.OK, new Metadata())
 
     // Check that call completes after status but no message
@@ -83,18 +71,16 @@ object ClientSuite extends SimpleTestSuite {
     assert(result.value.get.failed.get.isInstanceOf[StatusRuntimeException])
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 1)
+
   }
 
-  test("error response to unaryToUnary") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("error response to unaryToUnary") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()
-    dummy.listener.get.onMessage(5)
+    val client = fs2ClientCall(dummy, ur)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(r)
 
+    ec.tick()
+    dummy.listener.get.onMessage(5)
     dummy.listener.get.onClose(Status.INTERNAL, new Metadata())
 
     // Check that call completes after status but no message
@@ -110,19 +96,17 @@ object ClientSuite extends SimpleTestSuite {
     )
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 1)
+
   }
 
-  test("stream to streamingToUnary") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("stream to streamingToUnary") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
+    val client = fs2ClientCall(dummy, ur)
     val result = client
       .streamingToUnaryCall(Stream.emits(List("a", "b", "c")), new Metadata())
-      .unsafeToFuture()
+      .unsafeToFuture()(r)
 
+    ec.tick()
     dummy.listener.get.onMessage(5)
 
     // Check that call does not complete after result returns
@@ -136,19 +120,17 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 3)
     assertEquals(dummy.requested, 1)
+
   }
 
-  test("0-length to streamingToUnary") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("0-length to streamingToUnary") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
+    val client = fs2ClientCall(dummy, ur)
     val result = client
       .streamingToUnaryCall(Stream.empty, new Metadata())
-      .unsafeToFuture()
+      .unsafeToFuture()(r)
 
+    ec.tick()
     dummy.listener.get.onMessage(5)
 
     // Check that call does not complete after result returns
@@ -162,17 +144,15 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 0)
     assertEquals(dummy.requested, 1)
+
   }
 
-  test("single message to unaryToStreaming") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("single message to unaryToStreaming") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
-    val result = client.unaryToStreamingCall("hello", new Metadata()).compile.toList.unsafeToFuture()
+    val client = fs2ClientCall(dummy, ur)
+    val result = client.unaryToStreamingCall("hello", new Metadata()).compile.toList.unsafeToFuture()(r)
 
+    ec.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
     dummy.listener.get.onMessage(3)
@@ -188,21 +168,20 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 4)
+
   }
 
-  test("stream to streamingToStreaming") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("stream to streamingToStreaming") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
+    val client = fs2ClientCall(dummy, ur)
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
         .compile
         .toList
-        .unsafeToFuture()
+        .unsafeToFuture()(r)
+
+    ec.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
     dummy.listener.get.onMessage(3)
@@ -218,23 +197,20 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 5)
     assertEquals(dummy.requested, 4)
+
   }
 
-  test("cancellation for streamingToStreaming") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-    implicit val timer: Timer[IO] = ec.timer
-
+  runTest0("cancellation for streamingToStreaming") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
+    val client = fs2ClientCall(dummy, ur)
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
         .compile
         .toList
         .timeout(1.second)
-        .unsafeToFuture()
+        .unsafeToFuture()(r)
+
     ec.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
@@ -249,22 +225,20 @@ object ClientSuite extends SimpleTestSuite {
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[TimeoutException])
     assertEquals(dummy.cancelled.isDefined, true)
+
   }
 
-  test("error returned from streamingToStreaming") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
+  runTest0("error returned from streamingToStreaming") { (ec, r, ur) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy)
+    val client = fs2ClientCall(dummy, ur)
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
         .compile
         .toList
-        .unsafeToFuture()
+        .unsafeToFuture()(r)
 
+    ec.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
     dummy.listener.get.onMessage(3)
@@ -288,26 +262,22 @@ object ClientSuite extends SimpleTestSuite {
     )
     assertEquals(dummy.messagesSent.size, 5)
     assertEquals(dummy.requested, 4)
+
   }
 
-  test("resource awaits termination of managed channel") {
-    implicit val ec: TestContext = TestContext()
-
-    import implicits._
-    val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()
+  runTest0("resource awaits termination of managed channel") { (ec, r, _) =>
+    import org.lyranthe.fs2_grpc.java_runtime.implicits._
+    val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()(r)
 
     ec.tick()
 
     val channel = result.value.get.get
     assert(channel.isTerminated)
+
   }
 
-  test("error adapter is used when applicable") {
-
-    implicit val ec: TestContext = TestContext()
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-
-    def testCalls(shouldAdapt: Boolean): Unit = {
+  runTest0("error adapter is used when applicable") { (ec, r, ur) =>
+    def testCalls(shouldAdapt: Boolean, ur: UnsafeRunner[IO]): Unit = {
 
       def testAdapter(call: Fs2ClientCall[IO, String, Int] => IO[Unit]): Unit = {
 
@@ -323,13 +293,15 @@ object ClientSuite extends SimpleTestSuite {
         }
 
         val dummy = new DummyClientCall()
-        val client = new Fs2ClientCall[IO, String, Int](dummy, adapter)
-        val result = call(client).unsafeToFuture()
+        val client = new Fs2ClientCall[IO, String, Int](dummy, ur, adapter)
+        val result = call(client).unsafeToFuture()(r)
 
+        ec.tick()
         dummy.listener.get.onClose(status, new Metadata())
         ec.tick()
 
         assertEquals(result.value.get.failed.get.getMessage, errorMsg)
+        ec.tickAll()
       }
 
       testAdapter(_.unaryToUnaryCall("hello", new Metadata()).void)
@@ -340,8 +312,8 @@ object ClientSuite extends SimpleTestSuite {
 
     ///
 
-    testCalls(shouldAdapt = true)
-    testCalls(shouldAdapt = false)
+    testCalls(shouldAdapt = true, ur)
+    testCalls(shouldAdapt = false, ur)
 
   }
 

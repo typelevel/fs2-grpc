@@ -2,24 +2,28 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package client
 
-import cats.effect.{Effect, ConcurrentEffect}
+import cats.ApplicativeError
+import cats.effect.kernel.Concurrent
+import cats.effect.std.Dispatcher
 import cats.implicits._
 import fs2.{Pull, Stream}
 import fs2.concurrent.Queue
 import io.grpc.{ClientCall, Metadata, Status}
 
-class Fs2StreamClientCallListener[F[_]: Effect, Response](
+class Fs2StreamClientCallListener[F[_], Response] private (
     request: Int => Unit,
-    queue: Queue[F, Either[GrpcStatus, Response]]
-) extends ClientCall.Listener[Response] {
+    queue: Queue[F, Either[GrpcStatus, Response]],
+    runner: UnsafeRunner[F]
+)(implicit F: ApplicativeError[F, Throwable])
+    extends ClientCall.Listener[Response] {
 
   override def onMessage(message: Response): Unit = {
     request(1)
-    queue.enqueue1(message.asRight).unsafeRun()
+    runner.unsafeRunSync(queue.enqueue1(message.asRight))
   }
 
   override def onClose(status: Status, trailers: Metadata): Unit =
-    queue.enqueue1(GrpcStatus(status, trailers).asLeft).unsafeRun()
+    runner.unsafeRunSync(queue.enqueue1(GrpcStatus(status, trailers).asLeft))
 
   def stream: Stream[F, Response] = {
 
@@ -41,7 +45,18 @@ class Fs2StreamClientCallListener[F[_]: Effect, Response](
 
 object Fs2StreamClientCallListener {
 
-  def apply[F[_]: ConcurrentEffect, Response](request: Int => Unit): F[Fs2StreamClientCallListener[F, Response]] =
-    Queue.unbounded[F, Either[GrpcStatus, Response]].map(new Fs2StreamClientCallListener[F, Response](request, _))
+  def apply[F[_]: Concurrent, Response](
+      request: Int => Unit,
+      dispatcher: Dispatcher[F]
+  ): F[Fs2StreamClientCallListener[F, Response]] =
+    apply[F, Response](request, UnsafeRunner[F](dispatcher))
+
+  private[client] def apply[F[_]: Concurrent, Response](
+      request: Int => Unit,
+      runner: UnsafeRunner[F]
+  ): F[Fs2StreamClientCallListener[F, Response]] =
+    Queue.unbounded[F, Either[GrpcStatus, Response]].map { q =>
+      new Fs2StreamClientCallListener[F, Response](request, q, runner)
+    }
 
 }

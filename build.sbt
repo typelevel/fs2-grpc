@@ -2,7 +2,7 @@ import Dependencies._
 
 inThisBuild(
   List(
-    scalaVersion := "2.13.2",
+    scalaVersion := "2.13.3",
     organization := "org.lyranthe.fs2-grpc",
     git.useGitDescribe := true,
     scmInfo := Some(ScmInfo(url("https://github.com/fiadliel/fs2-grpc"), "git@github.com:fiadliel/fs2-grpc.git"))
@@ -66,12 +66,12 @@ lazy val `sbt-java-gen` = project
 lazy val `java-runtime` = project
   .enablePlugins(GitVersioning)
   .settings(
-    scalaVersion := "2.13.2",
+    scalaVersion := "2.13.3",
     crossScalaVersions := List(scalaVersion.value, "2.12.11"),
     publishTo := sonatypePublishToBundle.value,
-    libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, catsEffectLaws, minitest).map(_ % Test),
+    libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
     mimaPreviousArtifacts := Set(organization.value %% name.value % "0.3.0"),
     Test / parallelExecution := false,
-    testFrameworks += new TestFramework("minitest.runner.Framework"),
+    testFrameworks += new TestFramework("munit.Framework"),
     addCompilerPlugin(kindProjector)
   )

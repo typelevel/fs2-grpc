@@ -82,28 +82,18 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     _.add(s"trait $serviceNameFs2[F[_], $Ctx] {").indent.call(serviceMethods).outdent.add("}")
 
   private[this] def serviceObject: PrinterEndo =
-    _.add(s"object $serviceNameFs2 {").indent.newline
-      .call(serviceClientMeta)
-      .newline
+    _.add(s"object $serviceNameFs2 extends $Companion[$serviceNameFs2] {").indent.newline
       .call(serviceClient)
-      .newline
-      .call(serviceBindingMeta)
       .newline
       .call(serviceBinding)
       .outdent
+      .newline
       .add("}")
 
   private[this] def serviceClient: PrinterEndo = {
     _.add(
-      s"def client[F[_]: $Async, $Ctx](channel: $Channel, f: $Ctx => $Metadata, $CallOptionsFnDefault, $ErrorAdapterDefault): $Resource[F, $serviceNameFs2[F, $Ctx]] ="
+      s"def client[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, f: $Ctx => $Metadata, $CallOptionsFnDefault, $ErrorAdapterDefault): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
     ).indent
-      .add(s"$Dispatcher[F].map(client0[F, $Ctx](_, channel, f, $CallOptionsFnName, $ErrorAdapterName))")
-      .newline
-      .outdent
-      .add(
-        s"def client0[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, f: $Ctx => $Metadata, $CallOptionsFnDefault, $ErrorAdapterDefault): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
-      )
-      .indent
       .call(serviceMethodImplementations)
       .outdent
       .add("}")
@@ -111,55 +101,16 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceBinding: PrinterEndo = {
     _.add(
-      s"def service[F[_]: $Async, $Ctx](serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => Either[$Error, $Ctx]): $Resource[F, $ServerServiceDefinition] ="
-    ).indent
-      .add(s"$Dispatcher[F].map(service0[F, $Ctx](_, serviceImpl, f))")
-      .newline
-      .outdent
-      .add(
-        s"def service0[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => Either[$Error, $Ctx]): $ServerServiceDefinition = {"
-      )
-      .indent
-      .newline
+      s"def service[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => Either[$Error, $Ctx]): $ServerServiceDefinition = {"
+    ).indent.newline
       .add(
         s"val g: $Metadata => F[$Ctx] = f(_).leftMap[Throwable]($FailedPrecondition.withDescription(_).asRuntimeException()).liftTo[F]"
       )
       .newline
-      .indent
       .add(s"$ServerServiceDefinition")
       .call(serviceBindingImplementations)
+      .outdent
       .add("}")
-  }
-
-  /// For those that prefer io.grpc.Metadata instead of parameterized context
-
-  private[this] def serviceClientMeta: PrinterEndo =
-    _.add(
-      s"def stub[F[_]: $Async](channel: $Channel, callOptions: $CallOptions = $CallOptions.DEFAULT, $ErrorAdapterDefault): $Resource[F, $serviceNameFs2[F, $Metadata]] ="
-    ).indent
-      .add(s"client[F, $Metadata](channel, identity, _ => callOptions, $ErrorAdapterName)")
-      .outdent
-      .newline
-      .add(
-        s"def stub0[F[_]: $Async](dispatcher: $Dispatcher[F], channel: $Channel, callOptions: $CallOptions = $CallOptions.DEFAULT, $ErrorAdapterDefault): $serviceNameFs2[F, $Metadata] ="
-      )
-      .indent
-      .add(s"client0[F, $Metadata](dispatcher, channel, identity, _ => callOptions, $ErrorAdapterName)")
-      .outdent
-
-  private[this] def serviceBindingMeta: PrinterEndo = {
-    _.add(
-      s"def bindService[F[_]: $Async](serviceImpl: $serviceNameFs2[F, $Metadata]): $Resource[F, $ServerServiceDefinition] ="
-    ).indent
-      .add(s"service[F, $Metadata](serviceImpl, _.asRight[$Error])")
-      .outdent
-      .newline
-      .add(
-        s"def bindService0[F[_]: $Async](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Metadata]): $ServerServiceDefinition ="
-      )
-      .indent
-      .add(s"service0[F, $Metadata](dispatcher, serviceImpl, _.asRight[$Error])")
-      .outdent
   }
 
   ///
@@ -194,6 +145,7 @@ object Fs2GrpcServicePrinter {
 
     val Fs2ServerCallHandler = s"$jrtPkg.server.Fs2ServerCallHandler"
     val Fs2ClientCall = s"$jrtPkg.client.Fs2ClientCall"
+    val Companion = s"$jrtPkg.GeneratedCompanion"
 
     val ErrorAdapter = s"$grpcPkg.StatusRuntimeException => Option[Exception]"
     val ErrorAdapterName = "errorAdapter"

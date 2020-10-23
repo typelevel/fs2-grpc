@@ -14,12 +14,12 @@ class ClientSuite extends Fs2GrpcSuite {
   private def fs2ClientCall(dummy: DummyClientCall, ur: UnsafeRunner[IO]) =
     new Fs2ClientCall[IO, String, Int](dummy, ur, _ => None)
 
-  runTest0("single message to unaryToUnary") { (ec, r, ur) =>
+  runTest0("single message to unaryToUnary") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(r)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(5)
 
     // Check that call does not complete after result returns
@@ -28,27 +28,27 @@ class ClientSuite extends Fs2GrpcSuite {
     dummy.listener.get.onClose(Status.OK, new Metadata())
 
     // Check that call completes after status
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 1)
 
   }
 
-  runTest0("cancellation for unaryToUnary") { (ec, r, ur) =>
+  runTest0("cancellation for unaryToUnary") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).timeout(1.second).unsafeToFuture()(r)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).timeout(1.second).unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(5)
 
     // Check that call does not complete after result returns
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, None)
 
     // Check that call is cancelled after 1 second
-    ec.tick(2.seconds)
+    tc.tick(2.seconds)
 
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[TimeoutException])
@@ -56,16 +56,16 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("no response message to unaryToUnary") { (ec, r, ur) =>
+  runTest0("no response message to unaryToUnary") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(r)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onClose(Status.OK, new Metadata())
 
     // Check that call completes after status but no message
-    ec.tick()
+    tc.tick()
     assert(result.value.isDefined)
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[StatusRuntimeException])
@@ -74,17 +74,17 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("error response to unaryToUnary") { (ec, r, ur) =>
+  runTest0("error response to unaryToUnary") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
-    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(r)
+    val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(5)
     dummy.listener.get.onClose(Status.INTERNAL, new Metadata())
 
     // Check that call completes after status but no message
-    ec.tick()
+    tc.tick()
     assert(result.value.isDefined)
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[StatusRuntimeException])
@@ -99,79 +99,79 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("stream to streamingToUnary") { (ec, r, ur) =>
+  runTest0("stream to streamingToUnary") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
     val result = client
       .streamingToUnaryCall(Stream.emits(List("a", "b", "c")), new Metadata())
-      .unsafeToFuture()(r)
+      .unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(5)
 
     // Check that call does not complete after result returns
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, None)
 
     dummy.listener.get.onClose(Status.OK, new Metadata())
 
     // Check that call completes after status
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 3)
     assertEquals(dummy.requested, 1)
 
   }
 
-  runTest0("0-length to streamingToUnary") { (ec, r, ur) =>
+  runTest0("0-length to streamingToUnary") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
     val result = client
       .streamingToUnaryCall(Stream.empty, new Metadata())
-      .unsafeToFuture()(r)
+      .unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(5)
 
     // Check that call does not complete after result returns
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, None)
 
     dummy.listener.get.onClose(Status.OK, new Metadata())
 
     // Check that call completes after status
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 0)
     assertEquals(dummy.requested, 1)
 
   }
 
-  runTest0("single message to unaryToStreaming") { (ec, r, ur) =>
+  runTest0("single message to unaryToStreaming") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
-    val result = client.unaryToStreamingCall("hello", new Metadata()).compile.toList.unsafeToFuture()(r)
+    val result = client.unaryToStreamingCall("hello", new Metadata()).compile.toList.unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
     dummy.listener.get.onMessage(3)
 
     // Check that call does not complete after result returns
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, None)
 
     dummy.listener.get.onClose(Status.OK, new Metadata())
 
     // Check that call completes after status
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 4)
 
   }
 
-  runTest0("stream to streamingToStreaming") { (ec, r, ur) =>
+  runTest0("stream to streamingToStreaming") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
     val result =
@@ -179,28 +179,28 @@ class ClientSuite extends Fs2GrpcSuite {
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
         .compile
         .toList
-        .unsafeToFuture()(r)
+        .unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
     dummy.listener.get.onMessage(3)
 
     // Check that call does not complete after result returns
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, None)
 
     dummy.listener.get.onClose(Status.OK, new Metadata())
 
     // Check that call completes after status
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 5)
     assertEquals(dummy.requested, 4)
 
   }
 
-  runTest0("cancellation for streamingToStreaming") { (ec, r, ur) =>
+  runTest0("cancellation for streamingToStreaming") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
     val result =
@@ -209,26 +209,26 @@ class ClientSuite extends Fs2GrpcSuite {
         .compile
         .toList
         .timeout(1.second)
-        .unsafeToFuture()(r)
+        .unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
     dummy.listener.get.onMessage(3)
 
     // Check that call does not complete after result returns
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, None)
 
     // Check that call completes after status
-    ec.tick(2.seconds)
+    tc.tick(2.seconds)
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[TimeoutException])
     assertEquals(dummy.cancelled.isDefined, true)
 
   }
 
-  runTest0("error returned from streamingToStreaming") { (ec, r, ur) =>
+  runTest0("error returned from streamingToStreaming") { (tc, io, ur) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, ur)
     val result =
@@ -236,21 +236,21 @@ class ClientSuite extends Fs2GrpcSuite {
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
         .compile
         .toList
-        .unsafeToFuture()(r)
+        .unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
     dummy.listener.get.onMessage(1)
     dummy.listener.get.onMessage(2)
     dummy.listener.get.onMessage(3)
 
     // Check that call does not complete after result returns
-    ec.tick()
+    tc.tick()
     assertEquals(result.value, None)
 
     dummy.listener.get.onClose(Status.INTERNAL, new Metadata())
 
     // Check that call completes after status
-    ec.tick()
+    tc.tick()
     assert(result.value.isDefined)
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[StatusRuntimeException])
@@ -265,18 +265,18 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("resource awaits termination of managed channel") { (ec, r, _) =>
+  runTest0("resource awaits termination of managed channel") { (tc, io, _) =>
     import org.lyranthe.fs2_grpc.java_runtime.implicits._
-    val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()(r)
+    val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()(io)
 
-    ec.tick()
+    tc.tick()
 
     val channel = result.value.get.get
     assert(channel.isTerminated)
 
   }
 
-  runTest0("error adapter is used when applicable") { (ec, r, ur) =>
+  runTest0("error adapter is used when applicable") { (tc, io, ur) =>
     def testCalls(shouldAdapt: Boolean, ur: UnsafeRunner[IO]): Unit = {
 
       def testAdapter(call: Fs2ClientCall[IO, String, Int] => IO[Unit]): Unit = {
@@ -294,14 +294,14 @@ class ClientSuite extends Fs2GrpcSuite {
 
         val dummy = new DummyClientCall()
         val client = new Fs2ClientCall[IO, String, Int](dummy, ur, adapter)
-        val result = call(client).unsafeToFuture()(r)
+        val result = call(client).unsafeToFuture()(io)
 
-        ec.tick()
+        tc.tick()
         dummy.listener.get.onClose(status, new Metadata())
-        ec.tick()
+        tc.tick()
 
         assertEquals(result.value.get.failed.get.getMessage, errorMsg)
-        ec.tickAll()
+        tc.tickAll()
       }
 
       testAdapter(_.unaryToUnaryCall("hello", new Metadata()).void)

@@ -17,14 +17,14 @@ class ServerSuite extends Fs2GrpcSuite {
 
   private[this] def singleUnaryToUnary(
       options: ServerCallOptions = ServerCallOptions.default
-  ): (TestContext, UnsafeRunner[IO]) => Unit = { (ec, ur) =>
+  ): (TestContext, UnsafeRunner[IO]) => Unit = { (tc, ur) =>
     val dummy = new DummyServerCall
 
     val listener = Fs2UnaryServerCallListener[IO](dummy, ur, options).unsafeRunSync()
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
     listener.onMessage("123")
     listener.onHalfClose()
-    ec.tick()
+    tc.tick()
 
     assertEquals(dummy.messages.size, 1)
     assertEquals(dummy.messages(0), 3)

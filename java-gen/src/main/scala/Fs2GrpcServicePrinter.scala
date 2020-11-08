@@ -90,6 +90,8 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
       .call(serviceBindingMeta)
       .newline
       .call(serviceBinding)
+      .newline
+      .call(serviceBindingF)
       .outdent
       .add("}")
 
@@ -109,6 +111,25 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
       .add(
         s"val g: $Metadata => F[$Ctx] = f(_).leftMap[Throwable]($FailedPrecondition.withDescription(_).asRuntimeException()).liftTo[F]"
       )
+      .newline
+      .add(s"serviceF[F, A](serviceImpl, g)")
+      .outdent
+      .add("}")
+  }
+
+  private[this] def serviceBindingF: PrinterEndo = {
+    _.add(
+      s"def serviceF[F[_]: $ConcurrentEffect, $Ctx](serviceImpl: $serviceNameFs2[F, $Ctx], f: $Metadata => F[$Ctx]): $ServerServiceDefinition = {"
+    ).indent.newline
+      .add(s"val g: $Metadata => F[$Ctx] = f(_).handleErrorWith {")
+      .indent(2)
+      .add(s"case e: io.grpc.StatusException => _root_.cats.MonadError[F, Throwable].raiseError(e)")
+      .add(s"case e: io.grpc.StatusRuntimeException => _root_.cats.MonadError[F, Throwable].raiseError(e)")
+      .add(
+        s"case e: java.lang.Throwable => _root_.cats.MonadError[F, Throwable].raiseError($InternalError.withDescription(e.getMessage).asRuntimeException)"
+      )
+      .outdent(2)
+      .add("}")
       .newline
       .add(s"$ServerServiceDefinition")
       .call(serviceBindingImplementations)
@@ -175,6 +196,7 @@ object Fs2GrpcServicePrinter {
     val Channel = s"$grpcPkg.Channel"
     val Metadata = s"$grpcPkg.Metadata"
     val FailedPrecondition = s"$grpcPkg.Status.FAILED_PRECONDITION"
+    val InternalError = s"$grpcPkg.Status.INTERNAL"
 
   }
 

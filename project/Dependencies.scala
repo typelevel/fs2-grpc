@@ -6,9 +6,9 @@ object Dependencies {
 
     val grpc = scalapb.compiler.Version.grpcJavaVersion
     val scalaPb = scalapb.compiler.Version.scalapbVersion
-    val fs2 = "2.4.4"
-    val catsEffect = "2.2.0"
-    val minitest = "2.8.2"
+    val fs2 = "3.0.0-M2"
+    val catsEffect = "3.0.0-M2"
+    val ceMunit = "0.4-1085529"
 
     val kindProjector = "0.10.3"
     val sbtProtoc = "0.99.34"
@@ -23,9 +23,9 @@ object Dependencies {
 
   // Testing
 
-  val catsEffectLaws = "org.typelevel" %% "cats-effect-laws" % versions.catsEffect
+  val ceTestkit = "org.typelevel" %% "cats-effect-testkit" % versions.catsEffect
+  val ceMunit = "org.typelevel" %% "munit-cats-effect-3" % versions.ceMunit
   val grpcNetty = "io.grpc" % "grpc-netty-shaded" % versions.grpc
-  val minitest = "io.monix" %% "minitest" % versions.minitest
 
   // Compiler & SBT Plugins
 

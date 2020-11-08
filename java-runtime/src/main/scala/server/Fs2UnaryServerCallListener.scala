@@ -2,40 +2,40 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package server
 
-import cats.effect.{ConcurrentEffect, Effect}
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.MonadError
 import cats.syntax.all._
+import cats.effect.kernel.{Async, Deferred, Ref}
 import io.grpc._
 
 class Fs2UnaryServerCallListener[F[_], Request, Response] private (
     request: Ref[F, Option[Request]],
     isComplete: Deferred[F, Unit],
     val isCancelled: Deferred[F, Unit],
-    val call: Fs2ServerCall[F, Request, Response]
-)(implicit F: Effect[F])
+    val call: Fs2ServerCall[F, Request, Response],
+    val runner: UnsafeRunner[F]
+)(implicit F: MonadError[F, Throwable])
     extends ServerCall.Listener[Request]
     with Fs2ServerCallListener[F, F, Request, Response] {
 
   import Fs2UnaryServerCallListener._
 
-  override def onCancel(): Unit = {
-    isCancelled.complete(()).unsafeRun()
-  }
+  override def onCancel(): Unit =
+    runner.unsafeRunSync(isCancelled.complete(()).void)
 
   override def onMessage(message: Request): Unit = {
-    request.access
-      .flatMap[Unit] { case (curValue, modify) =>
-        if (curValue.isDefined)
-          F.raiseError(statusException(TooManyRequests))
-        else
-          modify(message.some).void
-      }
-      .unsafeRun()
-
+    runner.unsafeRunSync(
+      request.access
+        .flatMap[Unit] { case (curValue, modify) =>
+          if (curValue.isDefined)
+            F.raiseError(statusException(TooManyRequests))
+          else
+            modify(message.some).void
+        }
+    )
   }
 
   override def onHalfClose(): Unit =
-    isComplete.complete(()).unsafeRun()
+    runner.unsafeRunSync(isComplete.complete(()).void)
 
   override def source: F[Request] =
     for {
@@ -55,19 +55,18 @@ object Fs2UnaryServerCallListener {
 
   class PartialFs2UnaryServerCallListener[F[_]](val dummy: Boolean = false) extends AnyVal {
 
-    def apply[Request, Response](
+    private[server] def apply[Request, Response](
         call: ServerCall[Request, Response],
+        runner: UnsafeRunner[F],
         options: ServerCallOptions = ServerCallOptions.default
-    )(implicit
-        F: ConcurrentEffect[F]
-    ): F[Fs2UnaryServerCallListener[F, Request, Response]] =
-      for {
-        request <- Ref.of[F, Option[Request]](none)
-        isComplete <- Deferred[F, Unit]
-        isCancelled <- Deferred[F, Unit]
-        serverCall <- Fs2ServerCall[F, Request, Response](call, options)
-      } yield new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall)
+    )(implicit F: Async[F]): F[Fs2UnaryServerCallListener[F, Request, Response]] = for {
+      request <- Ref.of[F, Option[Request]](none)
+      isComplete <- Deferred[F, Unit]
+      isCancelled <- Deferred[F, Unit]
+      serverCall <- Fs2ServerCall[F, Request, Response](call, options)
+    } yield new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall, runner)
+
   }
 
-  def apply[F[_]] = new PartialFs2UnaryServerCallListener[F]
+  private[server] def apply[F[_]] = new PartialFs2UnaryServerCallListener[F]
 }

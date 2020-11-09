@@ -6,17 +6,18 @@ import scala.concurrent.duration._
 import scala.concurrent.TimeoutException
 import scala.util.Success
 import cats.effect._
+import cats.effect.std.Dispatcher
 import fs2._
 import io.grpc._
 
 class ClientSuite extends Fs2GrpcSuite {
 
-  private def fs2ClientCall(dummy: DummyClientCall, ur: UnsafeRunner[IO]) =
-    new Fs2ClientCall[IO, String, Int](dummy, ur, _ => None)
+  private def fs2ClientCall(dummy: DummyClientCall, d: Dispatcher[IO]) =
+    new Fs2ClientCall[IO, String, Int](dummy, d, _ => None)
 
-  runTest0("single message to unaryToUnary") { (tc, io, ur) =>
+  runTest0("single message to unaryToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(io)
 
     tc.tick()
@@ -35,9 +36,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("cancellation for unaryToUnary") { (tc, io, ur) =>
+  runTest0("cancellation for unaryToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result = client.unaryToUnaryCall("hello", new Metadata()).timeout(1.second).unsafeToFuture()(io)
 
     tc.tick()
@@ -56,9 +57,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("no response message to unaryToUnary") { (tc, io, ur) =>
+  runTest0("no response message to unaryToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(io)
 
     tc.tick()
@@ -74,9 +75,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("error response to unaryToUnary") { (tc, io, ur) =>
+  runTest0("error response to unaryToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result = client.unaryToUnaryCall("hello", new Metadata()).unsafeToFuture()(io)
 
     tc.tick()
@@ -99,9 +100,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("stream to streamingToUnary") { (tc, io, ur) =>
+  runTest0("stream to streamingToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result = client
       .streamingToUnaryCall(Stream.emits(List("a", "b", "c")), new Metadata())
       .unsafeToFuture()(io)
@@ -123,9 +124,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("0-length to streamingToUnary") { (tc, io, ur) =>
+  runTest0("0-length to streamingToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result = client
       .streamingToUnaryCall(Stream.empty, new Metadata())
       .unsafeToFuture()(io)
@@ -147,9 +148,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("single message to unaryToStreaming") { (tc, io, ur) =>
+  runTest0("single message to unaryToStreaming") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result = client.unaryToStreamingCall("hello", new Metadata()).compile.toList.unsafeToFuture()(io)
 
     tc.tick()
@@ -171,9 +172,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("stream to streamingToStreaming") { (tc, io, ur) =>
+  runTest0("stream to streamingToStreaming") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
@@ -200,9 +201,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("cancellation for streamingToStreaming") { (tc, io, ur) =>
+  runTest0("cancellation for streamingToStreaming") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
@@ -228,9 +229,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("error returned from streamingToStreaming") { (tc, io, ur) =>
+  runTest0("error returned from streamingToStreaming") { (tc, io, d) =>
     val dummy = new DummyClientCall()
-    val client = fs2ClientCall(dummy, ur)
+    val client = fs2ClientCall(dummy, d)
     val result =
       client
         .streamingToStreamingCall(Stream.emits(List("a", "b", "c", "d", "e")), new Metadata())
@@ -276,8 +277,8 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
-  runTest0("error adapter is used when applicable") { (tc, io, ur) =>
-    def testCalls(shouldAdapt: Boolean, ur: UnsafeRunner[IO]): Unit = {
+  runTest0("error adapter is used when applicable") { (tc, io, d) =>
+    def testCalls(shouldAdapt: Boolean, d: Dispatcher[IO]): Unit = {
 
       def testAdapter(call: Fs2ClientCall[IO, String, Int] => IO[Unit]): Unit = {
 
@@ -293,7 +294,7 @@ class ClientSuite extends Fs2GrpcSuite {
         }
 
         val dummy = new DummyClientCall()
-        val client = new Fs2ClientCall[IO, String, Int](dummy, ur, adapter)
+        val client = new Fs2ClientCall[IO, String, Int](dummy, d, adapter)
         val result = call(client).unsafeToFuture()(io)
 
         tc.tick()
@@ -312,8 +313,8 @@ class ClientSuite extends Fs2GrpcSuite {
 
     ///
 
-    testCalls(shouldAdapt = true, ur)
-    testCalls(shouldAdapt = false, ur)
+    testCalls(shouldAdapt = true, d)
+    testCalls(shouldAdapt = false, d)
 
   }
 

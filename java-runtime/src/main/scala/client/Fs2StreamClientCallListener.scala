@@ -13,17 +13,17 @@ import io.grpc.{ClientCall, Metadata, Status}
 class Fs2StreamClientCallListener[F[_], Response] private (
     request: Int => Unit,
     queue: Queue[F, Either[GrpcStatus, Response]],
-    runner: UnsafeRunner[F]
+    dispatcher: Dispatcher[F]
 )(implicit F: ApplicativeError[F, Throwable])
     extends ClientCall.Listener[Response] {
 
   override def onMessage(message: Response): Unit = {
     request(1)
-    runner.unsafeRunSync(queue.enqueue1(message.asRight))
+    dispatcher.unsafeRunSync(queue.enqueue1(message.asRight))
   }
 
   override def onClose(status: Status, trailers: Metadata): Unit =
-    runner.unsafeRunSync(queue.enqueue1(GrpcStatus(status, trailers).asLeft))
+    dispatcher.unsafeRunSync(queue.enqueue1(GrpcStatus(status, trailers).asLeft))
 
   def stream: Stream[F, Response] = {
 
@@ -49,14 +49,7 @@ object Fs2StreamClientCallListener {
       request: Int => Unit,
       dispatcher: Dispatcher[F]
   ): F[Fs2StreamClientCallListener[F, Response]] =
-    apply[F, Response](request, UnsafeRunner[F](dispatcher))
-
-  private[client] def apply[F[_]: Concurrent, Response](
-      request: Int => Unit,
-      runner: UnsafeRunner[F]
-  ): F[Fs2StreamClientCallListener[F, Response]] =
     Queue.unbounded[F, Either[GrpcStatus, Response]].map { q =>
-      new Fs2StreamClientCallListener[F, Response](request, q, runner)
+      new Fs2StreamClientCallListener[F, Response](request, q, dispatcher)
     }
-
 }

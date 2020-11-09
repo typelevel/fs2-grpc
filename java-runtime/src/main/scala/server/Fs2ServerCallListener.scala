@@ -4,6 +4,7 @@ package server
 
 import cats.effect._
 import cats.effect.kernel.Deferred
+import cats.effect.std.Dispatcher
 import cats.implicits._
 import fs2.Stream
 import io.grpc.{Metadata, Status, StatusException, StatusRuntimeException}
@@ -13,7 +14,7 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   def source: G[Request]
   def isCancelled: Deferred[F, Unit]
   def call: Fs2ServerCall[F, Request, Response]
-  def runner: UnsafeRunner[F]
+  def dispatcher: Dispatcher[F]
 
   private def reportError(t: Throwable)(implicit F: Sync[F]): F[Unit] = {
 
@@ -42,7 +43,7 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
     }
 
     // Exceptions are reported by closing the call
-    runner.unsafeRunAndForget(F.race(bracketed, isCancelled.get))
+    dispatcher.unsafeRunAndForget(F.race(bracketed, isCancelled.get))
   }
 
   def unsafeUnaryResponse(headers: Metadata, implementation: G[Request] => F[Response])(implicit

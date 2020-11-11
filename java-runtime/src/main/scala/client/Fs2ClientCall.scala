@@ -13,7 +13,7 @@ final case class GrpcStatus(status: Status, trailers: Metadata)
 
 class Fs2ClientCall[F[_], Request, Response] private[client] (
     call: ClientCall[Request, Response],
-    runner: UnsafeRunner[F],
+    dispatcher: Dispatcher[F],
     errorAdapter: StatusRuntimeException => Option[Exception]
 )(implicit F: Async[F]) {
 
@@ -81,12 +81,12 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   private def mkClientListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] =
     Resource.makeCase(
-      startListener(Fs2UnaryClientCallListener[F, Response](runner), md)
+      startListener(Fs2UnaryClientCallListener[F, Response](dispatcher), md)
     )(handleCallError)
 
   private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] =
     Resource.makeCase(
-      startListener(Fs2StreamClientCallListener[F, Response](call.request(_), runner), md)
+      startListener(Fs2StreamClientCallListener[F, Response](call.request(_), dispatcher), md)
     )(handleCallError)
 
 }
@@ -107,7 +107,7 @@ object Fs2ClientCall {
       F.delay(
         new Fs2ClientCall(
           channel.newCall[Request, Response](methodDescriptor, callOptions),
-          UnsafeRunner[F](dispatcher),
+          dispatcher,
           errorAdapter
         )
       )

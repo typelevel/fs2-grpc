@@ -8,14 +8,14 @@ import cats.implicits._
 import fs2._
 import io.grpc._
 
-class Fs2ServerCallHandler[F[_]: Async] private (runner: UnsafeRunner[F]) {
+class Fs2ServerCallHandler[F[_]: Async] private (dispatcher: Dispatcher[F]) {
 
   def unaryToUnaryCall[Request, Response](
       implementation: (Request, Metadata) => F[Response],
       options: ServerCallOptions = ServerCallOptions.default
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = runner.unsafeRunSync(Fs2UnaryServerCallListener[F](call, runner, options))
+      val listener = dispatcher.unsafeRunSync(Fs2UnaryServerCallListener[F](call, dispatcher, options))
       listener.unsafeUnaryResponse(headers, _ flatMap { request => implementation(request, headers) })
       listener
     }
@@ -26,7 +26,7 @@ class Fs2ServerCallHandler[F[_]: Async] private (runner: UnsafeRunner[F]) {
       options: ServerCallOptions = ServerCallOptions.default
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = runner.unsafeRunSync(Fs2UnaryServerCallListener[F](call, runner, options))
+      val listener = dispatcher.unsafeRunSync(Fs2UnaryServerCallListener[F](call, dispatcher, options))
       listener.unsafeStreamResponse(
         new Metadata(),
         v => Stream.eval(v) flatMap { request => implementation(request, headers) }
@@ -40,7 +40,7 @@ class Fs2ServerCallHandler[F[_]: Async] private (runner: UnsafeRunner[F]) {
       options: ServerCallOptions = ServerCallOptions.default
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = runner.unsafeRunSync(Fs2StreamServerCallListener[F](call, runner, options))
+      val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
       listener.unsafeUnaryResponse(headers, implementation(_, headers))
       listener
     }
@@ -51,7 +51,7 @@ class Fs2ServerCallHandler[F[_]: Async] private (runner: UnsafeRunner[F]) {
       options: ServerCallOptions = ServerCallOptions.default
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = runner.unsafeRunSync(Fs2StreamServerCallListener[F](call, runner, options))
+      val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
       listener.unsafeStreamResponse(headers, implementation(_, headers))
       listener
     }
@@ -61,8 +61,5 @@ class Fs2ServerCallHandler[F[_]: Async] private (runner: UnsafeRunner[F]) {
 object Fs2ServerCallHandler {
 
   def apply[F[_]: Async](dispatcher: Dispatcher[F]): Fs2ServerCallHandler[F] =
-    Fs2ServerCallHandler[F](UnsafeRunner[F](dispatcher))
-
-  private[server] def apply[F[_]: Async](runner: UnsafeRunner[F]): Fs2ServerCallHandler[F] =
-    new Fs2ServerCallHandler[F](runner)
+    new Fs2ServerCallHandler[F](dispatcher)
 }

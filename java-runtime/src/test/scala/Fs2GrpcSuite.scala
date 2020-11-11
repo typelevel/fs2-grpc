@@ -1,6 +1,7 @@
 package org.lyranthe.fs2_grpc
 package java_runtime
 
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import cats.effect.IO
 import cats.effect.std.Dispatcher
@@ -28,21 +29,23 @@ class Fs2GrpcSuite extends CatsEffectSuite with CatsEffectFunFixtures {
     (ctx, runtime)
   }
 
-  protected def runTest(name: String)(body: (TestContext, UnsafeRunner[IO]) => Unit): Unit =
-    runTest0(name)((tc, _, ur) => body(tc, ur))
+  protected def runTest(name: String)(body: (TestContext, Dispatcher[IO]) => Unit): Unit =
+    runTest0(name)((tc, _, d) => body(tc, d))
 
-  protected def runTest0(name: String)(body: (TestContext, IORuntime, UnsafeRunner[IO]) => Unit): Unit = {
+  protected def runTest0(name: String)(body: (TestContext, IORuntime, Dispatcher[IO]) => Unit): Unit = {
     test(name) {
       val (ec: TestContext, r: IORuntime) = createDeterministicRuntime
       val dispatcherF = Dispatcher[IO].allocated.unsafeToFuture()(r)
       ec.tick()
       val (dispatcher, shutdown) = dispatcherF.value.get.get
-      val runner: UnsafeRunner[IO] = new UnsafeRunner[IO] {
-        def unsafeRunAndForget[A](fa: IO[A]): Unit = dispatcher.unsafeRunAndForget(fa)
-        def unsafeRunSync[A](fa: IO[A]): A = fa.unsafeRunSync()
+      val fakeDispatcher: Dispatcher[IO] = new Dispatcher[IO] {
+        def unsafeToFutureCancelable[A](fa: IO[A]): (Future[A], () => Future[Unit]) =
+          dispatcher.unsafeToFutureCancelable(fa)
+        override def unsafeRunSync[A](fa: IO[A]): A =
+          fa.unsafeRunSync()
       }
 
-      body(ec, r, runner)
+      body(ec, r, fakeDispatcher)
       shutdown.unsafeRunAndForget()
       ec.tickAll()
     }

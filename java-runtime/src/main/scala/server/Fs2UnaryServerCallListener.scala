@@ -5,6 +5,7 @@ package server
 import cats.MonadError
 import cats.syntax.all._
 import cats.effect.kernel.{Async, Deferred, Ref}
+import cats.effect.std.Dispatcher
 import io.grpc._
 
 class Fs2UnaryServerCallListener[F[_], Request, Response] private (
@@ -12,7 +13,7 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
     isComplete: Deferred[F, Unit],
     val isCancelled: Deferred[F, Unit],
     val call: Fs2ServerCall[F, Request, Response],
-    val runner: UnsafeRunner[F]
+    val dispatcher: Dispatcher[F]
 )(implicit F: MonadError[F, Throwable])
     extends ServerCall.Listener[Request]
     with Fs2ServerCallListener[F, F, Request, Response] {
@@ -20,10 +21,10 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
   import Fs2UnaryServerCallListener._
 
   override def onCancel(): Unit =
-    runner.unsafeRunSync(isCancelled.complete(()).void)
+    dispatcher.unsafeRunSync(isCancelled.complete(()).void)
 
   override def onMessage(message: Request): Unit = {
-    runner.unsafeRunSync(
+    dispatcher.unsafeRunSync(
       request.access
         .flatMap[Unit] { case (curValue, modify) =>
           if (curValue.isDefined)
@@ -35,7 +36,7 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
   }
 
   override def onHalfClose(): Unit =
-    runner.unsafeRunSync(isComplete.complete(()).void)
+    dispatcher.unsafeRunSync(isComplete.complete(()).void)
 
   override def source: F[Request] =
     for {
@@ -57,14 +58,14 @@ object Fs2UnaryServerCallListener {
 
     private[server] def apply[Request, Response](
         call: ServerCall[Request, Response],
-        runner: UnsafeRunner[F],
+        dispatch: Dispatcher[F],
         options: ServerCallOptions = ServerCallOptions.default
     )(implicit F: Async[F]): F[Fs2UnaryServerCallListener[F, Request, Response]] = for {
       request <- Ref.of[F, Option[Request]](none)
       isComplete <- Deferred[F, Unit]
       isCancelled <- Deferred[F, Unit]
       serverCall <- Fs2ServerCall[F, Request, Response](call, options)
-    } yield new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall, runner)
+    } yield new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall, dispatch)
 
   }
 

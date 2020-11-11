@@ -4,6 +4,7 @@ package server
 
 import scala.concurrent.duration._
 import cats.effect._
+import cats.effect.std.Dispatcher
 import cats.effect.testkit.TestContext
 import fs2._
 import io.grpc._
@@ -17,10 +18,10 @@ class ServerSuite extends Fs2GrpcSuite {
 
   private[this] def singleUnaryToUnary(
       options: ServerCallOptions = ServerCallOptions.default
-  ): (TestContext, UnsafeRunner[IO]) => Unit = { (tc, ur) =>
+  ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
 
-    val listener = Fs2UnaryServerCallListener[IO](dummy, ur, options).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO](dummy, d, options).unsafeRunSync()
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
     listener.onMessage("123")
     listener.onHalfClose()
@@ -32,9 +33,9 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
-  runTest("cancellation for unaryToUnary") { (tc, ur) =>
+  runTest("cancellation for unaryToUnary") { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2UnaryServerCallListener[IO](dummy, ur).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO](dummy, d).unsafeRunSync()
 
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
 
@@ -55,9 +56,9 @@ class ServerSuite extends Fs2GrpcSuite {
 
   private def multipleUnaryToUnary(
       options: ServerCallOptions = ServerCallOptions.default
-  ): (TestContext, UnsafeRunner[IO]) => Unit = { (tc, ur) =>
+  ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2UnaryServerCallListener[IO](dummy, ur, options).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO](dummy, d, options).unsafeRunSync()
 
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
     listener.onMessage("123")
@@ -89,9 +90,9 @@ class ServerSuite extends Fs2GrpcSuite {
 
   private def singleUnaryToStreaming(
       options: ServerCallOptions = ServerCallOptions.default
-  ): (TestContext, UnsafeRunner[IO]) => Unit = { (tc, ur) =>
+  ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2UnaryServerCallListener[IO][String, Int](dummy, ur, options).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO][String, Int](dummy, d, options).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), s => Stream.eval(s).map(_.length).repeat.take(5))
     listener.onMessage("123")
@@ -104,9 +105,9 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
-  runTest("zero messages to streamingToStreaming") { (tc, ur) =>
+  runTest("zero messages to streamingToStreaming") { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, ur).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _ => Stream.emit(3).repeat.take(5))
     listener.onHalfClose()
@@ -118,9 +119,9 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
-  runTest("cancellation for streamingToStreaming") { (tc, ur) =>
+  runTest("cancellation for streamingToStreaming") { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, ur).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _ => Stream.emit(3).repeat.take(5))
     listener.onCancel()
@@ -136,9 +137,9 @@ class ServerSuite extends Fs2GrpcSuite {
 
   private def multipleStreamingToStreaming(
       options: ServerCallOptions = ServerCallOptions.default
-  ): (TestContext, UnsafeRunner[IO]) => Unit = { (tc, ur) =>
+  ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, ur, options).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d, options).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _.map(_.length).intersperse(0))
     listener.onMessage("a")
@@ -152,10 +153,10 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
-  runTest("messages to streamingToStreaming with error") { (tc, ur) =>
+  runTest("messages to streamingToStreaming with error") { (tc, d) =>
     val dummy = new DummyServerCall
     val error = new RuntimeException("hello")
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, ur).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _.map(_.length) ++ Stream.emit(0) ++ Stream.raiseError[IO](error))
     listener.onMessage("a")
@@ -175,12 +176,12 @@ class ServerSuite extends Fs2GrpcSuite {
 
   private def streamingToUnary(
       so: ServerCallOptions = ServerCallOptions.default
-  ): (TestContext, UnsafeRunner[IO]) => Unit = { (tc, ur) =>
+  ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val implementation: Stream[IO, String] => IO[Int] =
       _.compile.foldMonoid.map(_.length)
 
     val dummy = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, ur, so).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d, so).unsafeRunSync()
 
     listener.unsafeUnaryResponse(new Metadata(), implementation)
     listener.onMessage("ab")

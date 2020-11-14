@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+import "test.proto";
+
+package io.fs2.grpc;
+
+service TestService {  
+  rpc noStreaming (TestMessage) returns (TestMessage);
+  rpc clientStreaming (stream TestMessage) returns (TestMessage);
+  rpc serverStreaming (TestMessage) returns (stream TestMessage);
+  rpc bothStreaming (stream TestMessage) returns (stream TestMessage);
+}

@@ -31,6 +31,9 @@ object Dependencies {
 
   val sbtProtoc = "com.thesamet" % "sbt-protoc" % versions.sbtProtoc
   val scalaPbCompiler = "com.thesamet.scalapb" %% "compilerplugin" % versions.scalaPb
+  val scalaPbRuntime = "com.thesamet.scalapb" %% "scalapb-runtime" % versions.scalaPb
+  val scalaPbGrpcRuntime = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % versions.scalaPb
+
   val kindProjector = "org.typelevel" %% "kind-projector" % versions.kindProjector cross CrossVersion.binary
 
 }

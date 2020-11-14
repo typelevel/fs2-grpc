@@ -6,7 +6,7 @@ import com.google.protobuf.compiler.PluginProtos
 import com.google.protobuf.compiler.PluginProtos.{CodeGeneratorRequest, CodeGeneratorResponse}
 import protocbridge.ProtocCodeGenerator
 import scalapb.compiler.{FunctionalPrinter, GeneratorException, DescriptorImplicits, GeneratorParams}
-import scalapb.options.compiler.Scalapb
+import scalapb.options.Scalapb
 import scala.collection.JavaConverters._
 
 case class Fs2Params(serviceSuffix: String = "Fs2Grpc")

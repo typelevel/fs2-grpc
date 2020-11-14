@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+package io.fs2.grpc;
+
+enum Color {
+  UNKNOWN = 0;
+  RED     = 1;
+  GREEN   = 2;
+  BLUE    = 3;
+}
+
+message TestMessage {
+  
+  message NestedMessage {
+    required Color color = 1;
+  }
+
+  required string        a = 1;
+  required int32         b = 2;
+  optional NestedMessage c = 3;
+
+}

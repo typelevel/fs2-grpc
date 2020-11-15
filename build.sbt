@@ -45,7 +45,7 @@ lazy val root = project
         </developers>
     }
   )
-  .aggregate(`java-gen`, `sbt-java-gen`, `java-runtime`)
+  .aggregate(`java-gen`, `sbt-java-gen`, `java-runtime`, e2e)
 
 lazy val `java-gen` = project
   .enablePlugins(GitVersioning)
@@ -87,4 +87,32 @@ lazy val `java-runtime` = project
     Test / parallelExecution := false,
     testFrameworks += new TestFramework("munit.Framework"),
     addCompilerPlugin(kindProjector)
+  )
+
+lazy val codegenFullName =
+  "org.lyranthe.fs2_grpc.java_runtime.sbt_gen.Fs2CodeGenerator"
+
+lazy val protocGen = protocGenProject("protoc-gen", `java-gen`)
+  .settings(
+    Compile / mainClass := Some(codegenFullName),
+    scalaVersion := Scala212
+  )
+
+lazy val e2e = project
+  .in(file("e2e"))
+  .dependsOn(`java-runtime`)
+  .enablePlugins(LocalCodeGenPlugin, BuildInfoPlugin)
+  .settings(
+    skip in publish := true,
+    codeGenClasspath := (`java-gen` / Compile / fullClasspath).value,
+    libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),
+    testFrameworks += new TestFramework("munit.Framework"),
+    PB.targets in Compile := Seq(
+      scalapb.gen() -> (sourceManaged in Compile).value / "scalapb",
+      genModule(codegenFullName + "$") -> (sourceManaged in Compile).value / "fs2-grpc"
+    ),
+    buildInfoPackage := "io.fs2.grpc.buildinfo",
+    buildInfoKeys := Seq[BuildInfoKey](
+      "sourceManaged" -> (sourceManaged in Compile).value / "fs2-grpc"
+    )
   )

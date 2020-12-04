@@ -8,7 +8,7 @@ addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.1")
 
 addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.8.1")
 
-addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.15")
+addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.16")
 addSbtPlugin("com.codecommit" % "sbt-github-actions" % "0.9.5")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc-gen-project" % "0.1.4")

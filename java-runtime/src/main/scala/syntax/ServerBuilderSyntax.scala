@@ -56,7 +56,7 @@ final class ServerBuilderOps(val builder: ServerBuilder[_]) extends AnyVal {
     *
     * For different tradeoffs in shutdown behavior, see {{streamWithShutdown}}.
     */
-  def stream[F[_]](implicit F: Sync[F]): Stream[F, Server] =
+  def stream[F[_]](implicit F: Async[F]): Stream[F, Server] =
     Stream.resource(resource[F])
 
   /** Builds a `Server` into a bracketed stream. The server is shut
@@ -66,6 +66,6 @@ final class ServerBuilderOps(val builder: ServerBuilder[_]) extends AnyVal {
     * server, with respect to forceful vs. graceful shutdown and how
     * to poll or block for termination.
     */
-  def streamWithShutdown[F[_]](shutdown: Server => F[Unit])(implicit F: Sync[F]): Stream[F, Server] =
+  def streamWithShutdown[F[_]](shutdown: Server => F[Unit])(implicit F: Async[F]): Stream[F, Server] =
     Stream.resource(resourceWithShutdown(shutdown))
 }

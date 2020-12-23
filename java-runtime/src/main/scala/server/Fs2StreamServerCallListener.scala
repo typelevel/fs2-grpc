@@ -6,9 +6,8 @@ import cats.Functor
 import cats.syntax.all._
 import cats.effect.kernel.Deferred
 import cats.effect.Async
-import cats.effect.std.Dispatcher
+import cats.effect.std.{Dispatcher, Queue}
 import io.grpc.ServerCall
-import fs2.concurrent.Queue
 import fs2._
 
 class Fs2StreamServerCallListener[F[_], Request, Response] private (
@@ -25,14 +24,14 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
 
   override def onMessage(message: Request): Unit = {
     call.call.request(1)
-    dispatcher.unsafeRunSync(requestQ.enqueue1(message.some))
+    dispatcher.unsafeRunSync(requestQ.offer(message.some))
   }
 
   override def onHalfClose(): Unit =
-    dispatcher.unsafeRunSync(requestQ.enqueue1(none))
+    dispatcher.unsafeRunSync(requestQ.offer(none))
 
   override def source: Stream[F, Request] =
-    requestQ.dequeue.unNoneTerminate
+    Stream.repeatEval(requestQ.take).unNoneTerminate
 }
 
 object Fs2StreamServerCallListener {

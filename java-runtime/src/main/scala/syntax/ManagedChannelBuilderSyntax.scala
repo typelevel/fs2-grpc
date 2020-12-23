@@ -58,7 +58,7 @@ final class ManagedChannelBuilderOps(val builder: ManagedChannelBuilder[_]) exte
     *
     * For different tradeoffs in shutdown behavior, see {{streamWithShutdown}}.
     */
-  def stream[F[_]](implicit F: Sync[F]): Stream[F, ManagedChannel] =
+  def stream[F[_]](implicit F: Async[F]): Stream[F, ManagedChannel] =
     Stream.resource(resource[F])
 
   /** Builds a `ManagedChannel` into a bracketed stream. The managed channel is
@@ -68,6 +68,6 @@ final class ManagedChannelBuilderOps(val builder: ManagedChannelBuilder[_]) exte
     * channel, with respect to forceful vs. graceful shutdown and how to poll
     * or block for termination.
     */
-  def streamWithShutdown[F[_]](shutdown: ManagedChannel => F[Unit])(implicit F: Sync[F]): Stream[F, ManagedChannel] =
+  def streamWithShutdown[F[_]](shutdown: ManagedChannel => F[Unit])(implicit F: Async[F]): Stream[F, ManagedChannel] =
     Stream.resource(resourceWithShutdown(shutdown))
 }

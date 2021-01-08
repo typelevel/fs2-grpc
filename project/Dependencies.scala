@@ -12,7 +12,7 @@ object Dependencies {
     val ceMunit = "0.12.0"
 
     val kindProjector = "0.10.3"
-    val sbtProtoc = "0.99.34"
+    val sbtProtoc = "1.0.0-RC7"
 
   }
 

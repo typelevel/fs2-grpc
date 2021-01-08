@@ -6,12 +6,12 @@ object Dependencies {
 
     val grpc = scalapb.compiler.Version.grpcJavaVersion
     val scalaPb = scalapb.compiler.Version.scalapbVersion
-    val fs2 = "2.4.4"
-    val catsEffect = "2.2.0"
-    val minitest = "2.8.2"
+    val fs2 = "2.5.0"
+    val catsEffect = "2.3.1"
+    val minitest = "2.9.1"
 
     val kindProjector = "0.10.3"
-    val sbtProtoc = "0.99.34"
+    val sbtProtoc = "1.0.0-RC7"
 
   }
 

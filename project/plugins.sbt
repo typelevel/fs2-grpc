@@ -10,4 +10,4 @@ addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.8.1")
 
 addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.14")
 
-libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.10.10-preview4"
+libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.10.10-preview5"

@@ -5,11 +5,12 @@ import com.google.protobuf.ExtensionRegistry
 import com.google.protobuf.compiler.PluginProtos
 import com.google.protobuf.compiler.PluginProtos.{CodeGeneratorRequest, CodeGeneratorResponse}
 import protocbridge.ProtocCodeGenerator
-import scalapb.compiler.{FunctionalPrinter, GeneratorException, DescriptorImplicits, GeneratorParams}
-import scalapb.options.compiler.Scalapb
+import protocgen.CodeGenRequest
+import scalapb.compiler.{DescriptorImplicits, FunctionalPrinter, GeneratorException, GeneratorParams}
+import scalapb.options.Scalapb
 import scala.collection.JavaConverters._
 
-case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
+final case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
 
 object Fs2CodeGenerator extends ProtocCodeGenerator {
 
@@ -44,30 +45,24 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
     } yield (params, suffix)
 
   def handleCodeGeneratorRequest(request: PluginProtos.CodeGeneratorRequest): PluginProtos.CodeGeneratorResponse = {
-    val b = CodeGeneratorResponse.newBuilder
-    parseParameters(request.getParameter()) match {
+    val builder = CodeGeneratorResponse.newBuilder
+    val genRequest = CodeGenRequest(request)
+    parseParameters(genRequest.parameter) match {
       case Right((params, fs2params)) =>
         try {
-          val filesByName: Map[String, FileDescriptor] =
-            request.getProtoFileList.asScala.foldLeft[Map[String, FileDescriptor]](Map.empty) { case (acc, fp) =>
-              val deps = fp.getDependencyList.asScala.map(acc)
-              acc + (fp.getName -> FileDescriptor.buildFrom(fp, deps.toArray))
-            }
-
-          val implicits = new DescriptorImplicits(params, filesByName.values.toVector)
-          val genFiles = request.getFileToGenerateList.asScala.map(filesByName)
-          val srvFiles = genFiles.flatMap(generateServiceFiles(_, fs2params, implicits))
-          b.addAllFile(srvFiles.asJava)
+          val implicits = DescriptorImplicits.fromCodeGenRequest(params, genRequest)
+          val srvFiles = genRequest.filesToGenerate.flatMap(generateServiceFiles(_, fs2params, implicits))
+          builder.addAllFile(srvFiles.asJava)
         } catch {
           case e: GeneratorException =>
-            b.setError(e.message)
+            builder.setError(e.message)
         }
 
       case Left(error) =>
-        b.setError(error)
+        builder.setError(error)
     }
 
-    b.build()
+    builder.build()
   }
 
   override def run(req: Array[Byte]): Array[Byte] = {
@@ -75,7 +70,7 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
     val registry = ExtensionRegistry.newInstance()
     Scalapb.registerAllExtensions(registry)
     val request = CodeGeneratorRequest.parseFrom(req, registry)
-    handleCodeGeneratorRequest(request).toByteArray
+    handleCodeGeneratorRequest(request).toByteArray()
   }
 
   private[fs2_grpc] val ServiceSuffix: String = "serviceSuffix"

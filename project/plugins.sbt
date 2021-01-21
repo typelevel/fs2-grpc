@@ -12,4 +12,4 @@ addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.16")
 addSbtPlugin("com.codecommit" % "sbt-github-actions" % "0.10.1")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc-gen-project" % "0.1.6")
-libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.10.10-preview14"
+libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.10.10"

@@ -9,7 +9,7 @@ object Dependencies {
 
     val fs2 = "3.0.0-M7"
     val catsEffect = "3.0.0-M5"
-    val ceMunit = "0.12.0"
+    val ceMunit = "0.13.0"
 
     val kindProjector = "0.10.3"
     val sbtProtoc = "1.0.0"

@@ -8,7 +8,7 @@ object Dependencies {
     val scalaPb = scalapb.compiler.Version.scalapbVersion
     val fs2 = "2.5.0"
     val catsEffect = "2.3.1"
-    val minitest = "2.9.1"
+    val minitest = "2.9.2"
 
     val kindProjector = "0.10.3"
     val sbtProtoc = "1.0.0"

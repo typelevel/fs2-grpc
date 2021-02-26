@@ -1,7 +1,7 @@
 import Dependencies._
 
 lazy val Scala213 = "2.13.4"
-lazy val Scala212 = "2.12.13"
+lazy val Scala212 = "2.13.5"
 
 inThisBuild(
   List(

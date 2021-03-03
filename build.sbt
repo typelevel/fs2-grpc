@@ -2,7 +2,7 @@ import Dependencies._
 
 inThisBuild(
   List(
-    scalaVersion := "2.13.4",
+    scalaVersion := "2.13.5",
     organization := "org.lyranthe.fs2-grpc",
     git.useGitDescribe := true,
     scmInfo := Some(ScmInfo(url("https://github.com/fiadliel/fs2-grpc"), "git@github.com:fiadliel/fs2-grpc.git"))
@@ -65,7 +65,7 @@ lazy val `sbt-java-gen` = project
 lazy val `java-runtime` = project
   .enablePlugins(GitVersioning)
   .settings(
-    scalaVersion := "2.13.4",
+    scalaVersion := "2.13.5",
     crossScalaVersions := List(scalaVersion.value, "2.12.13"),
     publishTo := sonatypePublishToBundle.value,
     libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, catsEffectLaws, minitest).map(_ % Test),

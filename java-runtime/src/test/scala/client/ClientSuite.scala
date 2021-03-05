@@ -268,7 +268,9 @@ class ClientSuite extends Fs2GrpcSuite {
 
   runTest0("resource awaits termination of managed channel") { (tc, io, _) =>
     import org.lyranthe.fs2_grpc.java_runtime.implicits._
-    val result = ManagedChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()(io)
+    import netty.shaded.io.grpc.netty.NettyChannelBuilder
+
+    val result = NettyChannelBuilder.forAddress("127.0.0.1", 0).resource[IO].use(IO.pure).unsafeToFuture()(io)
 
     tc.tick()
 

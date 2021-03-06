@@ -77,8 +77,9 @@ class ServerSuite extends Fs2GrpcSuite {
 
   runTest0("resource awaits termination of server") { (tc, r, _) =>
     import org.lyranthe.fs2_grpc.java_runtime.implicits._
+    import netty.shaded.io.grpc.netty.NettyServerBuilder
 
-    val result = ServerBuilder.forPort(0).resource[IO].use(IO.pure).unsafeToFuture()(r)
+    val result = NettyServerBuilder.forPort(0).resource[IO].use(IO.pure).unsafeToFuture()(r)
     tc.tick()
 
     val server = result.value.get.get

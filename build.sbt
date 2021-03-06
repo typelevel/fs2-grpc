@@ -1,12 +1,13 @@
 import Dependencies._
 
-lazy val Scala213 = "2.13.4"
+lazy val Scala3 = "3.0.0-RC1"
+lazy val Scala213 = "2.13.5"
 lazy val Scala212 = "2.12.13"
 
 inThisBuild(
   List(
-    scalaVersion := Scala213,
-    crossScalaVersions := List(Scala213, Scala212),
+    scalaVersion := Scala3,
+    crossScalaVersions := List(Scala3, Scala213, Scala212),
     organization := "org.lyranthe.fs2-grpc",
     git.useGitDescribe := true,
     scmInfo := Some(ScmInfo(url("https://github.com/fiadliel/fs2-grpc"), "git@github.com:fiadliel/fs2-grpc.git"))
@@ -82,11 +83,12 @@ lazy val `java-runtime` = project
   .enablePlugins(GitVersioning)
   .settings(
     publishTo := sonatypePublishToBundle.value,
-    libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
+    libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test) ++ {
+      if(isDotty.value) Seq() else Seq(compilerPlugin(kindProjector))
+    },
     mimaPreviousArtifacts := Set(organization.value %% name.value % "0.3.0"),
     Test / parallelExecution := false,
-    testFrameworks += new TestFramework("munit.Framework"),
-    addCompilerPlugin(kindProjector)
+    testFrameworks += new TestFramework("munit.Framework")    
   )
 
 lazy val codegenFullName =
@@ -105,7 +107,14 @@ lazy val e2e = project
   .settings(
     skip in publish := true,
     codeGenClasspath := (`java-gen` / Compile / fullClasspath).value,
-    libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),
+    libraryDependencies := Nil,
+    libraryDependencies ++= List(
+      // TODO: Remove when ScalaPB 0.11.x is published for Scala 3.0.0-RC1+
+      scalaPbGrpcRuntime.withDottyCompat(scalaVersion.value),
+      scalaPbRuntime.withDottyCompat(scalaVersion.value),
+      scalaPbRuntime.withDottyCompat(scalaVersion.value) % "protobuf",
+      ceMunit % Test
+    ),
     testFrameworks += new TestFramework("munit.Framework"),
     PB.targets in Compile := Seq(
       scalapb.gen() -> (sourceManaged in Compile).value / "scalapb",

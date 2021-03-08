@@ -108,13 +108,7 @@ lazy val e2e = project
     skip in publish := true,
     codeGenClasspath := (`java-gen` / Compile / fullClasspath).value,
     libraryDependencies := Nil,
-    libraryDependencies ++= List(
-      // TODO: Remove when ScalaPB 0.11.x is published for Scala 3.0.0-RC1+
-      scalaPbGrpcRuntime.withDottyCompat(scalaVersion.value),
-      scalaPbRuntime.withDottyCompat(scalaVersion.value),
-      scalaPbRuntime.withDottyCompat(scalaVersion.value) % "protobuf",
-      ceMunit % Test
-    ),
+    libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),
     testFrameworks += new TestFramework("munit.Framework"),
     PB.targets in Compile := Seq(
       scalapb.gen() -> (sourceManaged in Compile).value / "scalapb",

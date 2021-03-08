@@ -49,14 +49,14 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
     Stream
-      .resource(mkClientListenerR(headers))
+      .resource(mkUnaryListenerR(headers))
       .evalMap(sendSingleMessage(message) *> _.getValue.adaptError(ea))
       .compile
       .lastOrError
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
     Stream
-      .resource(mkClientListenerR(headers))
+      .resource(mkUnaryListenerR(headers))
       .flatMap(l => Stream.eval(l.getValue.adaptError(ea)).concurrently(sendStream(messages)))
       .compile
       .lastOrError
@@ -73,21 +73,21 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   ///
 
-  private def handleCallError: (ClientCall.Listener[Response], Resource.ExitCase) => F[Unit] = {
-    case (_, Resource.ExitCase.Succeeded) => F.unit
+  private def handleExitCase(cancelSucceed: Boolean): (ClientCall.Listener[Response], Resource.ExitCase) => F[Unit] = {
+    case (_, Resource.ExitCase.Succeeded) => cancel("call done".some, None).whenA(cancelSucceed)
     case (_, Resource.ExitCase.Canceled) => cancel("call was cancelled".some, None)
     case (_, Resource.ExitCase.Errored(t)) => cancel(t.getMessage.some, t.some)
   }
 
-  private def mkClientListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] =
+  private def mkUnaryListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] =
     Resource.makeCase(
       startListener(Fs2UnaryClientCallListener[F, Response](dispatcher), md)
-    )(handleCallError)
+    )(handleExitCase(cancelSucceed = false))
 
   private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] =
     Resource.makeCase(
       startListener(Fs2StreamClientCallListener[F, Response](call.request(_), dispatcher), md)
-    )(handleCallError)
+    )(handleExitCase(cancelSucceed = true))
 
 }
 

@@ -9,11 +9,13 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent._
 
 trait ManagedChannelBuilderSyntax {
-  implicit final def fs2GrpcSyntaxManagedChannelBuilder(builder: ManagedChannelBuilder[_]): ManagedChannelBuilderOps =
-    new ManagedChannelBuilderOps(builder)
+  implicit final def fs2GrpcSyntaxManagedChannelBuilder[MCB <: ManagedChannelBuilder[MCB]](
+      builder: MCB
+  ): ManagedChannelBuilderOps[MCB] =
+    new ManagedChannelBuilderOps[MCB](builder)
 }
 
-final class ManagedChannelBuilderOps(val builder: ManagedChannelBuilder[_]) extends AnyVal {
+final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val builder: MCB) extends AnyVal {
 
   /** Builds a `ManagedChannel` into a bracketed stream. The managed channel is
     * shut down when the stream is complete.  Shutdown is as follows:

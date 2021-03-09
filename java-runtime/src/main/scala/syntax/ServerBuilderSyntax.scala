@@ -9,11 +9,11 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent._
 
 trait ServerBuilderSyntax {
-  implicit final def fs2GrpcSyntaxServerBuilder(builder: ServerBuilder[_]): ServerBuilderOps =
-    new ServerBuilderOps(builder)
+  implicit final def fs2GrpcSyntaxServerBuilder[SB <: ServerBuilder[SB]](builder: SB): ServerBuilderOps[SB] =
+    new ServerBuilderOps[SB](builder)
 }
 
-final class ServerBuilderOps(val builder: ServerBuilder[_]) extends AnyVal {
+final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends AnyVal {
 
   /** Builds a `Server` into a bracketed resource. The server is shut
     * down when the resource is released. Shutdown is as follows:

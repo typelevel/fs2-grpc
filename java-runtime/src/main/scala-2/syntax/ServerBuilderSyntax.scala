@@ -2,11 +2,9 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package syntax
 
-import cats.effect._
+import cats.effect.{Resource, Sync}
 import fs2.Stream
 import io.grpc.{Server, ServerBuilder}
-import java.util.concurrent.TimeUnit
-import scala.concurrent._
 
 trait ServerBuilderSyntax {
   implicit final def fs2GrpcSyntaxServerBuilder[SB <: ServerBuilder[SB]](builder: SB): ServerBuilderOps[SB] =
@@ -25,16 +23,8 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     *
     * For different tradeoffs in shutdown behavior, see {{resourceWithShutdown}}.
     */
-  def resource[F[_]](implicit F: Sync[F]): Resource[F, Server] =
-    resourceWithShutdown { server =>
-      F.delay {
-        server.shutdown()
-        if (!blocking(server.awaitTermination(30, TimeUnit.SECONDS))) {
-          server.shutdownNow()
-          ()
-        }
-      }
-    }
+  def resource[F[_]: Sync]: Resource[F, Server] =
+    serverResource[F, SB](builder)
 
   /** Builds a `Server` into a bracketed resource. The server is shut
     * down when the resource is released.
@@ -43,8 +33,8 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     * server, with respect to forceful vs. graceful shutdown and how
     * to poll or block for termination.
     */
-  def resourceWithShutdown[F[_]](shutdown: Server => F[Unit])(implicit F: Sync[F]): Resource[F, Server] =
-    Resource.make(F.delay(builder.build()))(shutdown)
+  def resourceWithShutdown[F[_]: Sync](shutdown: Server => F[Unit]): Resource[F, Server] =
+    serverResourceWithShutdown[F, SB](builder)(shutdown)
 
   /** Builds a `Server` into a bracketed stream. The server is shut
     * down when the stream is complete.  Shutdown is as follows:
@@ -56,7 +46,7 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     *
     * For different tradeoffs in shutdown behavior, see {{streamWithShutdown}}.
     */
-  def stream[F[_]](implicit F: Async[F]): Stream[F, Server] =
+  def stream[F[_]: Sync]: Stream[F, Server] =
     Stream.resource(resource[F])
 
   /** Builds a `Server` into a bracketed stream. The server is shut
@@ -66,6 +56,6 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     * server, with respect to forceful vs. graceful shutdown and how
     * to poll or block for termination.
     */
-  def streamWithShutdown[F[_]](shutdown: Server => F[Unit])(implicit F: Async[F]): Stream[F, Server] =
-    Stream.resource(resourceWithShutdown(shutdown))
+  def streamWithShutdown[F[_]: Sync](shutdown: Server => F[Unit]): Stream[F, Server] =
+    Stream.resource(resourceWithShutdown[F](shutdown))
 }

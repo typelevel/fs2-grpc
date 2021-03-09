@@ -2,11 +2,9 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package syntax
 
-import cats.effect._
+import cats.effect.{Resource, Sync}
 import fs2.Stream
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
-import java.util.concurrent.TimeUnit
-import scala.concurrent._
 
 trait ManagedChannelBuilderSyntax {
   implicit final def fs2GrpcSyntaxManagedChannelBuilder[MCB <: ManagedChannelBuilder[MCB]](
@@ -27,16 +25,8 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
     *
     * For different tradeoffs in shutdown behavior, see {{resourceWithShutdown}}.
     */
-  def resource[F[_]](implicit F: Sync[F]): Resource[F, ManagedChannel] =
-    resourceWithShutdown { ch =>
-      F.delay {
-        ch.shutdown()
-        if (!blocking(ch.awaitTermination(30, TimeUnit.SECONDS))) {
-          ch.shutdownNow()
-          ()
-        }
-      }
-    }
+  def resource[F[_]: Sync]: Resource[F, ManagedChannel] =
+    channelResource[F, MCB](builder)
 
   /** Builds a `ManagedChannel` into a bracketed resource. The managed channel is
     * shut down when the resource is released.
@@ -45,10 +35,8 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
     * channel, with respect to forceful vs. graceful shutdown and how to poll
     * or block for termination.
     */
-  def resourceWithShutdown[F[_]](
-      shutdown: ManagedChannel => F[Unit]
-  )(implicit F: Sync[F]): Resource[F, ManagedChannel] =
-    Resource.make(F.delay(builder.build()))(shutdown)
+  def resourceWithShutdown[F[_]: Sync](shutdown: ManagedChannel => F[Unit]): Resource[F, ManagedChannel] =
+    channelResourceWithShutdown[F, MCB](builder)(shutdown)
 
   /** Builds a `ManagedChannel` into a bracketed stream. The managed channel is
     * shut down when the resource is released.  Shutdown is as follows:
@@ -60,7 +48,7 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
     *
     * For different tradeoffs in shutdown behavior, see {{streamWithShutdown}}.
     */
-  def stream[F[_]](implicit F: Async[F]): Stream[F, ManagedChannel] =
+  def stream[F[_]: Sync]: Stream[F, ManagedChannel] =
     Stream.resource(resource[F])
 
   /** Builds a `ManagedChannel` into a bracketed stream. The managed channel is
@@ -70,6 +58,6 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
     * channel, with respect to forceful vs. graceful shutdown and how to poll
     * or block for termination.
     */
-  def streamWithShutdown[F[_]](shutdown: ManagedChannel => F[Unit])(implicit F: Async[F]): Stream[F, ManagedChannel] =
-    Stream.resource(resourceWithShutdown(shutdown))
+  def streamWithShutdown[F[_]: Sync](shutdown: ManagedChannel => F[Unit]): Stream[F, ManagedChannel] =
+    Stream.resource(resourceWithShutdown[F](shutdown))
 }

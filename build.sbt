@@ -15,8 +15,12 @@ inThisBuild(
     githubWorkflowJavaVersions := Seq("adopt@1.8", "adopt@1.11"),
     githubWorkflowBuild := Seq(
       WorkflowStep.Sbt(
+        name = Some("Run scalafmtCheckAll"),
+        commands = List("scalafmtCheckAll")
+      ),
+      WorkflowStep.Sbt(
         name = Some("Run tests"),
-        commands = List("scalafmtCheckAll", "test")
+        commands = List("test")
       )
     ),
     githubWorkflowPublishTargetBranches := Nil

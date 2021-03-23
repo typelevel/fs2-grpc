@@ -22,7 +22,7 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
     file.getServices.asScala.map { service =>
       val p = new Fs2GrpcServicePrinter(service, fs2params.serviceSuffix, di)
 
-      import di.{ServiceDescriptorPimp, FileDescriptorPimp}
+      import di.{ExtendedServiceDescriptor, ExtendedFileDescriptor}
       val code = p.printService(FunctionalPrinter()).result()
       val b = CodeGeneratorResponse.File.newBuilder()
       b.setName(file.scalaDirectory + "/" + service.name + s"${fs2params.serviceSuffix}.scala")

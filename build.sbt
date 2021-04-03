@@ -64,7 +64,6 @@ lazy val `sbt-java-gen` = project
     crossScalaVersions := List(Scala212),
     publishTo := sonatypePublishToBundle.value,
     sbtPlugin := true,
-    crossSbtVersions := List(sbtVersion.value),
     buildInfoPackage := "org.lyranthe.fs2_grpc.buildinfo",
     buildInfoKeys := Seq[BuildInfoKey](
       name,

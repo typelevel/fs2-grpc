@@ -11,7 +11,6 @@ object Dependencies {
     val catsEffect = "3.0.1"
     val ceMunit = "1.0.1"
 
-    val kindProjector = "0.10.3"
     val sbtProtoc = "1.0.2"
 
   }
@@ -34,7 +33,5 @@ object Dependencies {
   val scalaPbCompiler = "com.thesamet.scalapb" %% "compilerplugin" % versions.scalaPb
   val scalaPbRuntime = "com.thesamet.scalapb" %% "scalapb-runtime" % versions.scalaPb
   val scalaPbGrpcRuntime = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % versions.scalaPb
-
-  val kindProjector = "org.typelevel" %% "kind-projector" % versions.kindProjector cross CrossVersion.binary
 
 }

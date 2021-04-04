@@ -42,27 +42,27 @@ lazy val server =
 
 ## Creating a client
 
-A `ManagedChannel` is the type used by `grpc-java` to manage a connection to a particular server. This library provides syntax for `ManagedChannelBuilder` which creates an FS2 `Stream` which can manage the shutdown of the channel, by calling `.stream[F]` where `F` has an instance of the `Sync` typeclass. This implementation will do a drain of the server, and attempt to shut down the server, forcefully closing after 30 seconds. An example of the syntax is:
+A `ManagedChannel` is the type used by `grpc-java` to manage a connection to a particular server. This library provides syntax for `ManagedChannelBuilder` which creates a `Resource` which can manage the shutdown of the channel, by calling `.resource[F]` where `F` has an instance of the `Sync` typeclass. This implementation will do a drain of the channel, and attempt to shut down the channel, forcefully closing after 30 seconds. An example of the syntax is:
 
 ```scala
-val managedChannelStream: Stream[IO, ManagedChannel] =
+import org.lyranthe.fs2_grpc.java_runtime.syntax.all._
+
+val managedChannelResource: Resource[IO, ManagedChannel] =
   ManagedChannelBuilder
     .forAddress("127.0.0.1", 9999)
-    .stream[IO]
+    .resource[IO]
 ```
 
-The syntax also offers the method `streamWithShutdown` which takes a function `ManagedChannel => F[Unit]` which is used to manage the shutdown. This may be used where requirements before shutdown do not match the default behaviour.
+The syntax also offers the method `resourceWithShutdown` which takes a function `ManagedChannel => F[Unit]` which is used to manage the shutdown. This may be used where requirements before shutdown do not match the default behaviour.
 
-The generated code provides a method `stub[F]` (for any `F` which has a `Sync` instance), and it takes a parameter of type `ManagedChannel`. It returns an implementation of the service (in a trait), which can be used to make calls.
+The generated code provides a method `stubResource[F]`, for any `F` which has a `Async` instance, and it takes a parameter of type `Channel`. It returns a `Resource` with an implementation of the service (in a trait), which can be used to make calls.
 
 ```scala
 def runProgram(stub: MyFs2Grpc[IO]): IO[Unit] = ???
 
-for {
-  managedChannel <- managedChannelStream
-  client = MyFs2Grpc.stub[IO](managedChannel)
-  _ <- Stream.eval(runProgram(client))
-} yield ()
+val run: IO[Unit] = managedChannelResource
+  .flatMap(ch => MyFs2Grpc.stubResource[IO](ch))
+  .use(runProgram)
 ```
 
 If a `ManagedChannelProvider` isn't found on your classpath you may receive an error similar to 
@@ -76,22 +76,24 @@ libraryDependencies += "io.grpc" % "grpc-netty-shaded" % scalapb.compiler.Versio
 
 ## Creating a server
 
-The generated code provides a method `bindService[F]` (for any `F` which has a `Sync` instance), and it takes an implementation of the service (in a trait), which is used to serve responses to RPC calls. It returns a `ServerServiceDefinition` which is given to the server builder when setting up the service.
+The generated code provides a method `bindServiceResource[F]`, for any `F` which has a `Async` instance, and it takes an implementation of the service (in a trait), which is used to serve responses to RPC calls. It returns a `Resource[F, ServerServiceDefinition]` which is given to the server builder when setting up the service.
 
 A `Server` is the type used by `grpc-java` to manage the server connections and lifecycle. This library provides syntax for `ServerBuilder`, which mirrors the pattern for the client. An example is:
 
 ```scala
-import org.lyranthe.fs2_grpc.java_runtime.implicits._
+import org.lyranthe.fs2_grpc.java_runtime.syntax.all._
 
-val helloService: ServerServiceDefinition = MyFs2Grpc.bindService(new MyImpl())
+val helloService: Resource[IO, ServerServiceDefinition] = 
+  MyFs2Grpc.bindServiceResource[IO](new MyImpl())
 
-ServerBuilder
+def run(service: ServerServiceDefinition) = ServerBuilder
   .forPort(9999)
-  .addService(helloService)
-  .addService(ProtoReflectionService.newInstance()) // reflection makes lots of tooling happy
-  .stream[IO] // or for any F: Sync
-  .evalMap(server => IO(server.start())) // start server
-  .evalMap(_ => IO.never) // server now running
+  .addService(service)
+  .resource[IO]
+  .evalMap(server => IO(server.start()))
+  .useForever
+
+helloService.use(run)
 ```
 
 ## Code generation options

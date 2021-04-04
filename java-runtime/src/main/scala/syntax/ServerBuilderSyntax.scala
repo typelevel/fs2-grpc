@@ -15,7 +15,7 @@ trait ServerBuilderSyntax {
 
 final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends AnyVal {
 
-  /** Builds a `Server` into a bracketed resource. The server is shut
+  /** Builds a `Server` into a resource. The server is shut
     * down when the resource is released. Shutdown is as follows:
     *
     * 1. We request an orderly shutdown, allowing preexisting calls to continue
@@ -36,7 +36,7 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
       }
     }
 
-  /** Builds a `Server` into a bracketed resource. The server is shut
+  /** Builds a `Server` into a resource. The server is shut
     * down when the resource is released.
     *
     * @param shutdown Determines the behavior of the cleanup of the
@@ -46,7 +46,7 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
   def resourceWithShutdown[F[_]](shutdown: Server => F[Unit])(implicit F: Sync[F]): Resource[F, Server] =
     Resource.make(F.delay(builder.build()))(shutdown)
 
-  /** Builds a `Server` into a bracketed stream. The server is shut
+  /** Builds a `Server` into a stream. The server is shut
     * down when the stream is complete.  Shutdown is as follows:
     *
     * 1. We request an orderly shutdown, allowing preexisting calls to continue
@@ -59,7 +59,7 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
   def stream[F[_]](implicit F: Async[F]): Stream[F, Server] =
     Stream.resource(resource[F])
 
-  /** Builds a `Server` into a bracketed stream. The server is shut
+  /** Builds a `Server` into a stream. The server is shut
     * down when the stream is complete.
     *
     * @param shutdown Determines the behavior of the cleanup of the

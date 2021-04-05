@@ -17,8 +17,8 @@ trait ManagedChannelBuilderSyntax {
 
 final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val builder: MCB) extends AnyVal {
 
-  /** Builds a `ManagedChannel` into a bracketed stream. The managed channel is
-    * shut down when the stream is complete.  Shutdown is as follows:
+  /** Builds a `ManagedChannel` into a resource. The managed channel is
+    * shut down when the resource is released. Shutdown is as follows:
     *
     * 1. We request an orderly shutdown, allowing preexisting calls to continue
     *    without accepting new calls.
@@ -38,7 +38,7 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
       }
     }
 
-  /** Builds a `ManagedChannel` into a bracketed resource. The managed channel is
+  /** Builds a `ManagedChannel` into a resource. The managed channel is
     * shut down when the resource is released.
     *
     * @param shutdown Determines the behavior of the cleanup of the managed
@@ -50,8 +50,8 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
   )(implicit F: Sync[F]): Resource[F, ManagedChannel] =
     Resource.make(F.delay(builder.build()))(shutdown)
 
-  /** Builds a `ManagedChannel` into a bracketed stream. The managed channel is
-    * shut down when the resource is released.  Shutdown is as follows:
+  /** Builds a `ManagedChannel` into a stream. The managed channel is
+    * shut down when the stream is complete.  Shutdown is as follows:
     *
     * 1. We request an orderly shutdown, allowing preexisting calls to continue
     *    without accepting new calls.
@@ -63,7 +63,7 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
   def stream[F[_]](implicit F: Async[F]): Stream[F, ManagedChannel] =
     Stream.resource(resource[F])
 
-  /** Builds a `ManagedChannel` into a bracketed stream. The managed channel is
+  /** Builds a `ManagedChannel` into a stream. The managed channel is
     * shut down when the stream is complete.
     *
     * @param shutdown Determines the behavior of the cleanup of the managed

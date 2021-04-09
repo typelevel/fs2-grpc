@@ -45,8 +45,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   def sendStream(stream: Stream[F, Request])(implicit F: Sync[F]): Stream[F, Unit] =
     stream.evalMap(sendMessage) ++ Stream.eval(halfClose)
 
-  def handleCallError(implicit F: Sync[F]): (ClientCall.Listener[Response], ExitCase[Throwable]) => F[Unit] = {
-    case (_, ExitCase.Completed) => F.unit
+  private def handleExitCase(cancelComplete: Boolean)(implicit F: Sync[F]): (ClientCall.Listener[Response], ExitCase[Throwable]) => F[Unit] = {
+    case (_, ExitCase.Completed) => cancel("call done".some, None).whenA(cancelComplete)
     case (_, ExitCase.Canceled) => cancel("call was cancelled".some, None)
     case (_, ExitCase.Error(t)) => cancel(t.getMessage.some, t.some)
   }
@@ -54,25 +54,25 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   def unaryToUnaryCall(message: Request, headers: Metadata)(implicit F: ConcurrentEffect[F]): F[Response] =
     F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers))(l =>
       sendSingleMessage(message) *> l.getValue.adaptError(ea)
-    )(handleCallError)
+    )(handleExitCase(cancelComplete = false))
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata)(implicit
       F: ConcurrentEffect[F]
   ): F[Response] =
     F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers))(l =>
       Stream.eval(l.getValue.adaptError(ea)).concurrently(sendStream(messages)).compile.lastOrError
-    )(handleCallError)
+    )(handleExitCase(cancelComplete = false))
 
   def unaryToStreamingCall(message: Request, headers: Metadata)(implicit F: ConcurrentEffect[F]): Stream[F, Response] =
     Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleCallError)
+      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleExitCase(cancelComplete = true))
       .flatMap(Stream.eval_(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
 
   def streamingToStreamingCall(messages: Stream[F, Request], headers: Metadata)(implicit
       F: ConcurrentEffect[F]
   ): Stream[F, Response] =
     Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleCallError)
+      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(handleExitCase(cancelComplete = true))
       .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))
 }
 

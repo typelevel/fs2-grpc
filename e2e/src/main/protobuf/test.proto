@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package io.fs2.grpc;
+package hello.world;
 
 enum Color {
   UNKNOWN = 0;

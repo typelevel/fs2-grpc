@@ -1,13 +1,13 @@
 # fs2-grpc - gRPC implementation for FS2/cats-effect
 
-[![Join the chat at https://gitter.im/fs2-grpc/Lobby](https://badges.gitter.im/fs2-grpc/Lobby.svg)](https://gitter.im/fs2-grpc/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Build Status](https://travis-ci.org/fiadliel/fs2-grpc.svg?branch=master)](https://travis-ci.org/fiadliel/fs2-grpc) [![Latest version](https://index.scala-lang.org/fiadliel/fs2-grpc/sbt-java-gen/latest.svg?color=orange&v=1)](https://index.scala-lang.org/fiadliel/fs2-grpc/sbt-java-gen)
+[![Gitter](https://badges.gitter.im/typelevel/fs2-grpc.svg)](https://gitter.im/typelevel/fs2-grpc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge) [![CI](https://github.com/typelevel/fs2-grpc/actions/workflows/ci.yml/badge.svg)](https://github.com/typelevel/fs2-grpc/actions/workflows/ci.yml) [![Latest version](https://index.scala-lang.org/typelevel/fs2-grpc/fs2-grpc/latest.svg?color=orange&v=1)](https://index.scala-lang.org/typelevel/fs2-grpc/fs2-grpc)
+ [![Scala Steward badge](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
 
 ## SBT configuration
 
 `project/plugins.sbt`:
 ```scala
-addSbtPlugin("org.lyranthe.fs2-grpc" % "sbt-java-gen" % "<latest-version>")
+addSbtPlugin("org.typelevel" % "sbt-fs2-grpc" % "<latest-version>")
 ```
 
 `build.sbt`:
@@ -45,7 +45,7 @@ lazy val server =
 A `ManagedChannel` is the type used by `grpc-java` to manage a connection to a particular server. This library provides syntax for `ManagedChannelBuilder` which creates a `Resource` which can manage the shutdown of the channel, by calling `.resource[F]` where `F` has an instance of the `Sync` typeclass. This implementation will do a drain of the channel, and attempt to shut down the channel, forcefully closing after 30 seconds. An example of the syntax is:
 
 ```scala
-import org.lyranthe.fs2_grpc.java_runtime.syntax.all._
+import fs2.grpc.syntax.all._
 
 val managedChannelResource: Resource[IO, ManagedChannel] =
   ManagedChannelBuilder
@@ -81,7 +81,7 @@ The generated code provides a method `bindServiceResource[F]`, for any `F` which
 A `Server` is the type used by `grpc-java` to manage the server connections and lifecycle. This library provides syntax for `ServerBuilder`, which mirrors the pattern for the client. An example is:
 
 ```scala
-import org.lyranthe.fs2_grpc.java_runtime.syntax.all._
+import fs2.grpc.syntax.all._
 
 val helloService: Resource[IO, ServerServiceDefinition] = 
   MyFs2Grpc.bindServiceResource[IO](new MyImpl())

@@ -59,7 +59,7 @@ jobs:
         run: sbt ++${{ matrix.scala }} scalafmtCheckAll test
 
       - name: Compress target directories
-        run: tar cf targets.tar sbt-java-gen/target target java-runtime/target java-gen/target .protoc-gen/target project/target
+        run: tar cf targets.tar plugin/target target codegen/target .protoc-gen/target runtime/target project/target
 
       - name: Upload target directories
         uses: actions/upload-artifact@v2

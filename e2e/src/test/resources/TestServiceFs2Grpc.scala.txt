@@ -1,38 +1,38 @@
-package io.fs2.grpc
+package hello.world
 
 import _root_.cats.syntax.all._
 
 trait TestServiceFs2Grpc[F[_], A] {
-  def noStreaming(request: io.fs2.grpc.TestMessage, ctx: A): F[io.fs2.grpc.TestMessage]
-  def clientStreaming(request: _root_.fs2.Stream[F, io.fs2.grpc.TestMessage], ctx: A): F[io.fs2.grpc.TestMessage]
-  def serverStreaming(request: io.fs2.grpc.TestMessage, ctx: A): _root_.fs2.Stream[F, io.fs2.grpc.TestMessage]
-  def bothStreaming(request: _root_.fs2.Stream[F, io.fs2.grpc.TestMessage], ctx: A): _root_.fs2.Stream[F, io.fs2.grpc.TestMessage]
+  def noStreaming(request: hello.world.TestMessage, ctx: A): F[hello.world.TestMessage]
+  def clientStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): F[hello.world.TestMessage]
+  def serverStreaming(request: hello.world.TestMessage, ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage]
+  def bothStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage]
 }
 
-object TestServiceFs2Grpc extends _root_.org.lyranthe.fs2_grpc.java_runtime.GeneratedCompanion[TestServiceFs2Grpc] {
+object TestServiceFs2Grpc extends _root_.fs2.grpc.GeneratedCompanion[TestServiceFs2Grpc] {
   
   def client[F[_]: _root_.cats.effect.Async, A](dispatcher: _root_.cats.effect.std.Dispatcher[F], channel: _root_.io.grpc.Channel, mkMeta: A => _root_.io.grpc.Metadata, coFn: _root_.io.grpc.CallOptions => _root_.io.grpc.CallOptions = identity, errorAdapter: _root_.io.grpc.StatusRuntimeException => Option[Exception] = _ => None): TestServiceFs2Grpc[F, A] = new TestServiceFs2Grpc[F, A] {
-    def noStreaming(request: io.fs2.grpc.TestMessage, ctx: A): F[io.fs2.grpc.TestMessage] = {
-      _root_.org.lyranthe.fs2_grpc.java_runtime.client.Fs2ClientCall[F](channel, io.fs2.grpc.TestServiceGrpc.METHOD_NO_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter).flatMap(_.unaryToUnaryCall(request, mkMeta(ctx)))
+    def noStreaming(request: hello.world.TestMessage, ctx: A): F[hello.world.TestMessage] = {
+      _root_.fs2.grpc.client.Fs2ClientCall[F](channel, hello.world.TestServiceGrpc.METHOD_NO_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter).flatMap(_.unaryToUnaryCall(request, mkMeta(ctx)))
     }
-    def clientStreaming(request: _root_.fs2.Stream[F, io.fs2.grpc.TestMessage], ctx: A): F[io.fs2.grpc.TestMessage] = {
-      _root_.org.lyranthe.fs2_grpc.java_runtime.client.Fs2ClientCall[F](channel, io.fs2.grpc.TestServiceGrpc.METHOD_CLIENT_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter).flatMap(_.streamingToUnaryCall(request, mkMeta(ctx)))
+    def clientStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): F[hello.world.TestMessage] = {
+      _root_.fs2.grpc.client.Fs2ClientCall[F](channel, hello.world.TestServiceGrpc.METHOD_CLIENT_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter).flatMap(_.streamingToUnaryCall(request, mkMeta(ctx)))
     }
-    def serverStreaming(request: io.fs2.grpc.TestMessage, ctx: A): _root_.fs2.Stream[F, io.fs2.grpc.TestMessage] = {
-      _root_.fs2.Stream.eval(_root_.org.lyranthe.fs2_grpc.java_runtime.client.Fs2ClientCall[F](channel, io.fs2.grpc.TestServiceGrpc.METHOD_SERVER_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter)).flatMap(_.unaryToStreamingCall(request, mkMeta(ctx)))
+    def serverStreaming(request: hello.world.TestMessage, ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage] = {
+      _root_.fs2.Stream.eval(_root_.fs2.grpc.client.Fs2ClientCall[F](channel, hello.world.TestServiceGrpc.METHOD_SERVER_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter)).flatMap(_.unaryToStreamingCall(request, mkMeta(ctx)))
     }
-    def bothStreaming(request: _root_.fs2.Stream[F, io.fs2.grpc.TestMessage], ctx: A): _root_.fs2.Stream[F, io.fs2.grpc.TestMessage] = {
-      _root_.fs2.Stream.eval(_root_.org.lyranthe.fs2_grpc.java_runtime.client.Fs2ClientCall[F](channel, io.fs2.grpc.TestServiceGrpc.METHOD_BOTH_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter)).flatMap(_.streamingToStreamingCall(request, mkMeta(ctx)))
+    def bothStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage] = {
+      _root_.fs2.Stream.eval(_root_.fs2.grpc.client.Fs2ClientCall[F](channel, hello.world.TestServiceGrpc.METHOD_BOTH_STREAMING, coFn(_root_.io.grpc.CallOptions.DEFAULT), dispatcher, errorAdapter)).flatMap(_.streamingToStreamingCall(request, mkMeta(ctx)))
     }
   }
   
   protected def serviceBinding[F[_]: _root_.cats.effect.Async, A](dispatcher: _root_.cats.effect.std.Dispatcher[F], serviceImpl: TestServiceFs2Grpc[F, A], mkCtx: _root_.io.grpc.Metadata => F[A]): _root_.io.grpc.ServerServiceDefinition = {
     _root_.io.grpc.ServerServiceDefinition
-      .builder(io.fs2.grpc.TestServiceGrpc.SERVICE)
-      .addMethod(io.fs2.grpc.TestServiceGrpc.METHOD_NO_STREAMING, _root_.org.lyranthe.fs2_grpc.java_runtime.server.Fs2ServerCallHandler[F](dispatcher).unaryToUnaryCall[io.fs2.grpc.TestMessage, io.fs2.grpc.TestMessage]((r, m) => mkCtx(m).flatMap(serviceImpl.noStreaming(r, _))))
-      .addMethod(io.fs2.grpc.TestServiceGrpc.METHOD_CLIENT_STREAMING, _root_.org.lyranthe.fs2_grpc.java_runtime.server.Fs2ServerCallHandler[F](dispatcher).streamingToUnaryCall[io.fs2.grpc.TestMessage, io.fs2.grpc.TestMessage]((r, m) => mkCtx(m).flatMap(serviceImpl.clientStreaming(r, _))))
-      .addMethod(io.fs2.grpc.TestServiceGrpc.METHOD_SERVER_STREAMING, _root_.org.lyranthe.fs2_grpc.java_runtime.server.Fs2ServerCallHandler[F](dispatcher).unaryToStreamingCall[io.fs2.grpc.TestMessage, io.fs2.grpc.TestMessage]((r, m) => _root_.fs2.Stream.eval(mkCtx(m)).flatMap(serviceImpl.serverStreaming(r, _))))
-      .addMethod(io.fs2.grpc.TestServiceGrpc.METHOD_BOTH_STREAMING, _root_.org.lyranthe.fs2_grpc.java_runtime.server.Fs2ServerCallHandler[F](dispatcher).streamingToStreamingCall[io.fs2.grpc.TestMessage, io.fs2.grpc.TestMessage]((r, m) => _root_.fs2.Stream.eval(mkCtx(m)).flatMap(serviceImpl.bothStreaming(r, _))))
+      .builder(hello.world.TestServiceGrpc.SERVICE)
+      .addMethod(hello.world.TestServiceGrpc.METHOD_NO_STREAMING, _root_.fs2.grpc.server.Fs2ServerCallHandler[F](dispatcher).unaryToUnaryCall[hello.world.TestMessage, hello.world.TestMessage]((r, m) => mkCtx(m).flatMap(serviceImpl.noStreaming(r, _))))
+      .addMethod(hello.world.TestServiceGrpc.METHOD_CLIENT_STREAMING, _root_.fs2.grpc.server.Fs2ServerCallHandler[F](dispatcher).streamingToUnaryCall[hello.world.TestMessage, hello.world.TestMessage]((r, m) => mkCtx(m).flatMap(serviceImpl.clientStreaming(r, _))))
+      .addMethod(hello.world.TestServiceGrpc.METHOD_SERVER_STREAMING, _root_.fs2.grpc.server.Fs2ServerCallHandler[F](dispatcher).unaryToStreamingCall[hello.world.TestMessage, hello.world.TestMessage]((r, m) => _root_.fs2.Stream.eval(mkCtx(m)).flatMap(serviceImpl.serverStreaming(r, _))))
+      .addMethod(hello.world.TestServiceGrpc.METHOD_BOTH_STREAMING, _root_.fs2.grpc.server.Fs2ServerCallHandler[F](dispatcher).streamingToStreamingCall[hello.world.TestMessage, hello.world.TestMessage]((r, m) => _root_.fs2.Stream.eval(mkCtx(m)).flatMap(serviceImpl.bothStreaming(r, _))))
       .build()
   }
 

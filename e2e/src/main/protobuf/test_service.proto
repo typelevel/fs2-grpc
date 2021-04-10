@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "test.proto";
 
-package io.fs2.grpc;
+package hello.world;
 
 service TestService {  
   rpc noStreaming (TestMessage) returns (TestMessage);

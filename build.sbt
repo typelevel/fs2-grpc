@@ -13,8 +13,6 @@ def dev(ghUser: String, name: String, email: String): Developer =
 
 inThisBuild(
   List(
-    mimaFailOnProblem := false,
-    mimaPreviousArtifacts := Set(),
     scalaVersion := Scala3,
     crossScalaVersions := List(Scala3, Scala213, Scala212),
     baseVersion := "1.0",
@@ -62,8 +60,7 @@ lazy val codegen = project
     name := "fs2-grpc-codegen",
     scalaVersion := Scala212,
     crossScalaVersions := List(Scala212),
-    libraryDependencies += scalaPbCompiler,
-    mimaPreviousArtifacts := Set()
+    libraryDependencies += scalaPbCompiler
   )
 
 lazy val codegenFullName =
@@ -103,7 +100,8 @@ lazy val protocGen = protocGenProject("protoc-gen", codegen)
   .settings(
     Compile / mainClass := Some(codegenFullName),
     scalaVersion := Scala212,
-    githubWorkflowArtifactUpload := false
+    githubWorkflowArtifactUpload := false,
+    publish / skip := true
   )
 
 lazy val e2e = project

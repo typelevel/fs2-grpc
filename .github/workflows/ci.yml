@@ -56,7 +56,7 @@ jobs:
         run: sbt ++${{ matrix.scala }} githubWorkflowCheck
 
       - name: Run tests
-        run: sbt ++${{ matrix.scala }} scalafmtCheckAll test
+        run: sbt ++${{ matrix.scala }} scalafmtCheckAll test mimaReportBinaryIssues
 
       - name: Compress target directories
         run: tar cf targets.tar plugin/target target codegen/target .protoc-gen/target runtime/target project/target

@@ -16,6 +16,12 @@ inThisBuild(
     scalaVersion := Scala3,
     crossScalaVersions := List(Scala3, Scala213, Scala212),
     baseVersion := "1.0",
+    versionIntroduced := Map(
+      // First version under org.typelevel
+      "2.12" -> "1.1.0",
+      "2.13" -> "1.1.0",
+      "3.0.0-RC2" -> "1.1.0",
+    )
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organization := "org.typelevel",

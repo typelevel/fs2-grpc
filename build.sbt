@@ -18,9 +18,9 @@ inThisBuild(
     baseVersion := "1.0",
     versionIntroduced := Map(
       // First version under org.typelevel
-      "2.12" -> "1.1.0",
-      "2.13" -> "1.1.0",
-      "3.0.0-RC2" -> "1.1.0"
+      "2.12" -> "1.1.2",
+      "2.13" -> "1.1.2",
+      "3.0.0-RC2" -> "1.1.2"
     ),
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
@@ -40,7 +40,7 @@ inThisBuild(
     githubWorkflowBuild := Seq(
       WorkflowStep.Sbt(
         name = Some("Run tests"),
-        commands = List("scalafmtCheckAll", "test")
+        commands = List("scalafmtCheckAll", "test", "mimaReportBinaryIssues")
       )
     ),
     githubWorkflowTargetBranches := List("*", "series/*")

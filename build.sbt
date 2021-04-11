@@ -14,6 +14,7 @@ def dev(ghUser: String, name: String, email: String): Developer =
 inThisBuild(
   List(
     mimaFailOnProblem := false,
+    mimaPreviousArtifacts := Set(),
     scalaVersion := Scala3,
     crossScalaVersions := List(Scala3, Scala213, Scala212),
     baseVersion := "1.0",
@@ -61,7 +62,8 @@ lazy val codegen = project
     name := "fs2-grpc-codegen",
     scalaVersion := Scala212,
     crossScalaVersions := List(Scala212),
-    libraryDependencies += scalaPbCompiler
+    libraryDependencies += scalaPbCompiler,
+    mimaPreviousArtifacts := Set()
   )
 
 lazy val codegenFullName =

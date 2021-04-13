@@ -53,7 +53,8 @@ inThisBuild(
 lazy val root = project
   .in(file("."))
   .enablePlugins(BuildInfoPlugin, NoPublishPlugin)
-  .aggregate(runtime, codegen, plugin, e2e, protocGen.agg)
+  .aggregate(runtime, codegen, plugin, e2e)
+  .dependsOn(protocGen.agg)
 
 lazy val codegen = project
   .settings(
@@ -101,7 +102,9 @@ lazy val protocGen = protocGenProject("protoc-gen", codegen)
     Compile / mainClass := Some(codegenFullName),
     scalaVersion := Scala212,
     githubWorkflowArtifactUpload := false,
-    publish / skip := true
+    publish / skip := true,
+    mimaFailOnNoPrevious := false,
+    mimaPreviousArtifacts := Set()
   )
 
 lazy val e2e = project

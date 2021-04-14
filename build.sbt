@@ -30,7 +30,7 @@ inThisBuild(
     publishFullName := "Ross A. Baker",
     homepage := Some(url("https://github.com/typelevel/fs2-grpc")),
     scmInfo := Some(ScmInfo(url("https://github.com/typelevel/fs2-grpc"), "git@github.com:typelevel/fs2-grpc.git")),
-    developers ++= List(
+    developers := List(
       dev("fiadliel", "Gary Coady", "gary@lyranthe.org"),
       dev("rossabaker", "Ross A. Baker", "ross@rossabaker.com"),
       dev("ahjohannessen", "Alex Henning Johannessen", "ahjohannessen@gmail.com")

@@ -13,7 +13,7 @@ def dev(ghUser: String, name: String, email: String): Developer =
 
 inThisBuild(
   List(
-    scalaVersion := Scala3,
+    scalaVersion := Scala213,
     crossScalaVersions := List(Scala3, Scala213, Scala212),
     baseVersion := "1.0",
     versionIntroduced := Map(

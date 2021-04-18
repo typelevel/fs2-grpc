@@ -68,7 +68,9 @@ class Fs2UnaryClientCallListener[F[_], Response] private (
 
 object Fs2UnaryClientCallListener {
 
-  def apply[F[_]: Async, Response](dispatcher: Dispatcher[F]): F[Fs2UnaryClientCallListener[F, Response]] =
+  private[client] def apply[F[_]: Async, Response](
+      dispatcher: Dispatcher[F]
+  ): F[Fs2UnaryClientCallListener[F, Response]] =
     (Deferred[F, GrpcStatus], Ref.of[F, Option[Response]](none)).mapN((response, value) =>
       new Fs2UnaryClientCallListener[F, Response](response, value, dispatcher)
     )

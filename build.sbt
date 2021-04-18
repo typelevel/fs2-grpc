@@ -1,3 +1,5 @@
+import com.typesafe.tools.mima.core._
+import com.typesafe.tools.mima.core.ProblemFilters._
 import Dependencies._
 
 lazy val Scala3 = "3.0.0-RC2"
@@ -47,6 +49,14 @@ inThisBuild(
   ) ++ List(
     spiewakCiReleaseSnapshots := false,
     spiewakMainBranches := Seq("master", "series/0.x")
+  ) ++ List(
+    mimaBinaryIssueFilters ++= {
+      Seq(
+        // Made internal
+        exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2UnaryClientCallListener.apply"),
+        exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2StreamClientCallListener.apply")
+      )
+    }
   )
 )
 

@@ -47,8 +47,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   private val halfClose: F[Unit] =
     F.delay(call.halfClose())
 
-  private val requestOne: F[Unit] =
-    F.delay(call.request(1))
+  private def request(numMessages: Int): F[Unit] =
+    F.delay(call.request(numMessages))
 
   private def sendMessage(message: Request): F[Unit] =
     F.delay(call.sendMessage(message))
@@ -57,7 +57,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     F.delay(call.start(listener, md))
 
   private def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], md: Metadata): F[A] =
-    createListener.flatTap(start(_, md)) <* requestOne
+    createListener.flatTap(start(_, md)) <* request(1)
 
   private def sendSingleMessage(message: Request): F[Unit] =
     sendMessage(message) *> halfClose
@@ -106,7 +106,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] =
     Resource.makeCase(
-      startListener(Fs2StreamClientCallListener[F, Response](call.request(_), dispatcher), md)
+      startListener(Fs2StreamClientCallListener[F, Response](request, dispatcher), md)
     )(handleExitCase(cancelSucceed = true))
 
 }

@@ -193,6 +193,33 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
+  runTest0("single message to unaryToStreaming - back pressure") { (tc, io, d) =>
+    val dummy = new DummyClientCall()
+    val client = fs2ClientCall(dummy, d)
+    val result = client
+      .unaryToStreamingCall("hello", new Metadata())
+      .take(2)
+      .compile
+      .toList
+      .unsafeToFuture()(io)
+
+    tc.tick()
+
+    dummy.listener.get.onMessage(1)
+    dummy.listener.get.onMessage(2)
+    dummy.listener.get.onMessage(3)
+    dummy.listener.get.onMessage(4)
+    dummy.listener.get.onClose(Status.OK, new Metadata())
+
+    tc.tick()
+
+    assertEquals(result.value, Some(Success(List(1, 2))))
+    assertEquals(dummy.messagesSent.size, 1)
+
+    // One initial when starting listener + two for take(2)
+    assertEquals(dummy.requested, 3)
+  }
+
   runTest0("stream to streamingToStreaming") { (tc, io, d) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, d)

@@ -23,23 +23,21 @@ package fs2
 package grpc
 package client
 
-import cats.MonadError
+import cats.{Applicative, MonadThrow}
 import cats.implicits._
 import cats.effect.kernel.Concurrent
 import cats.effect.std.{Dispatcher, Queue}
 import io.grpc.{ClientCall, Metadata, Status}
 
 class Fs2StreamClientCallListener[F[_], Response] private (
-    request: Int => Unit,
+    request: Int => F[Unit],
     queue: Queue[F, Either[GrpcStatus, Response]],
     dispatcher: Dispatcher[F]
-)(implicit F: MonadError[F, Throwable])
+)(implicit F: MonadThrow[F])
     extends ClientCall.Listener[Response] {
 
-  override def onMessage(message: Response): Unit = {
-    request(1)
+  override def onMessage(message: Response): Unit =
     dispatcher.unsafeRunSync(queue.offer(message.asRight))
-  }
 
   override def onClose(status: Status, trailers: Metadata): Unit =
     dispatcher.unsafeRunSync(queue.offer(GrpcStatus(status, trailers).asLeft))
@@ -48,7 +46,7 @@ class Fs2StreamClientCallListener[F[_], Response] private (
 
     val run: F[Option[Response]] =
       queue.take.flatMap {
-        case Right(v) => v.some.pure[F]
+        case Right(v) => v.some.pure[F] <* request(1)
         case Left(GrpcStatus(status, trailers)) =>
           if (!status.isOk) F.raiseError(status.asRuntimeException(trailers))
           else none[Response].pure[F]
@@ -60,8 +58,15 @@ class Fs2StreamClientCallListener[F[_], Response] private (
 
 object Fs2StreamClientCallListener {
 
+  @deprecated("Internal API. Will be removed from public API.", "1.1.4")
   def apply[F[_]: Concurrent, Response](
       request: Int => Unit,
+      dispatcher: Dispatcher[F]
+  ): F[Fs2StreamClientCallListener[F, Response]] =
+    create(request.andThen(Applicative[F].pure), dispatcher)
+
+  private[client] def create[F[_]: Concurrent, Response](
+      request: Int => F[Unit],
       dispatcher: Dispatcher[F]
   ): F[Fs2StreamClientCallListener[F, Response]] =
     Queue.unbounded[F, Either[GrpcStatus, Response]].map { q =>

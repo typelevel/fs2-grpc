@@ -1,3 +1,5 @@
+import com.typesafe.tools.mima.core._
+import com.typesafe.tools.mima.core.ProblemFilters._
 import Dependencies._
 
 lazy val Scala3 = "3.0.0-RC2"

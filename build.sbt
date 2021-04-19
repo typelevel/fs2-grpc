@@ -49,14 +49,6 @@ inThisBuild(
   ) ++ List(
     spiewakCiReleaseSnapshots := false,
     spiewakMainBranches := Seq("master", "series/0.x")
-  ) ++ List(
-    mimaBinaryIssueFilters ++= {
-      Seq(
-        // Made internal
-        exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2UnaryClientCallListener.apply"),
-        exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2StreamClientCallListener.apply")
-      )
-    }
   )
 )
 

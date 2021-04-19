@@ -101,12 +101,12 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   private def mkUnaryListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] =
     Resource.makeCase(
-      startListener(Fs2UnaryClientCallListener[F, Response](dispatcher), md)
+      startListener(Fs2UnaryClientCallListener.create[F, Response](dispatcher), md)
     )(handleExitCase(cancelSucceed = false))
 
   private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] =
     Resource.makeCase(
-      startListener(Fs2StreamClientCallListener[F, Response](request, dispatcher), md)
+      startListener(Fs2StreamClientCallListener.create[F, Response](request, dispatcher), md)
     )(handleExitCase(cancelSucceed = true))
 
 }

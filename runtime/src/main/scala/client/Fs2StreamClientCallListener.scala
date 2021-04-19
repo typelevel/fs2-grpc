@@ -23,7 +23,7 @@ package fs2
 package grpc
 package client
 
-import cats.MonadThrow
+import cats.{Applicative, MonadThrow}
 import cats.implicits._
 import cats.effect.kernel.Concurrent
 import cats.effect.std.{Dispatcher, Queue}
@@ -58,7 +58,14 @@ class Fs2StreamClientCallListener[F[_], Response] private (
 
 object Fs2StreamClientCallListener {
 
-  private[client] def apply[F[_]: Concurrent, Response](
+  @deprecated("Internal API. Will be removed from public API.", "1.1.4")
+  def apply[F[_]: Concurrent, Response](
+      request: Int => Unit,
+      dispatcher: Dispatcher[F]
+  ): F[Fs2StreamClientCallListener[F, Response]] =
+    create(request.andThen(Applicative[F].pure), dispatcher)
+
+  private[client] def create[F[_]: Concurrent, Response](
       request: Int => F[Unit],
       dispatcher: Dispatcher[F]
   ): F[Fs2StreamClientCallListener[F, Response]] =

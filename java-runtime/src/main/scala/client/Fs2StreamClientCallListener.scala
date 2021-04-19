@@ -2,7 +2,7 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package client
 
-import cats.effect.{Effect, ConcurrentEffect}
+import cats.effect.{Effect, ConcurrentEffect, Sync}
 import cats.implicits._
 import fs2.{Pull, Stream}
 import fs2.concurrent.Queue
@@ -13,10 +13,11 @@ class Fs2StreamClientCallListener[F[_]: Effect, Response](
     queue: Queue[F, Either[GrpcStatus, Response]]
 ) extends ClientCall.Listener[Response] {
 
-  override def onMessage(message: Response): Unit = {
-    request(1)
+  private val requestOne: F[Unit] =
+    Sync[F].delay(request(1))
+
+  override def onMessage(message: Response): Unit =
     queue.enqueue1(message.asRight).unsafeRun()
-  }
 
   override def onClose(status: Status, trailers: Metadata): Unit =
     queue.enqueue1(GrpcStatus(status, trailers).asLeft).unsafeRun()
@@ -35,13 +36,15 @@ class Fs2StreamClientCallListener[F[_]: Effect, Response](
       }
     }
 
-    go(queue.dequeue).stream
+    go(queue.dequeue).stream.evalTap(_ => requestOne)
   }
 }
 
 object Fs2StreamClientCallListener {
 
   def apply[F[_]: ConcurrentEffect, Response](request: Int => Unit): F[Fs2StreamClientCallListener[F, Response]] =
-    Queue.unbounded[F, Either[GrpcStatus, Response]].map(new Fs2StreamClientCallListener[F, Response](request, _))
+    Queue
+      .unbounded[F, Either[GrpcStatus, Response]]
+      .map(new Fs2StreamClientCallListener[F, Response](request, _))
 
 }

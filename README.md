@@ -118,3 +118,9 @@ The full set of options available are:
 ```scala
 PB.protocOptions in Compile := Seq("-xyz")
 ```
+
+### Tool Sponsorship
+
+<img width="185px" height="44px" align="right" src="https://www.yourkit.com/images/yklogo.png"/>Development of fs2-grpc is generously supported in part by [YourKit](https://www.yourkit.com) through the use of their excellent Java profiler.
+
+

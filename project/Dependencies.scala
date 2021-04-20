@@ -11,7 +11,7 @@ object Dependencies {
     val minitest = "2.9.4"
 
     val kindProjector = "0.10.3"
-    val sbtProtoc = "1.0.2"
+    val sbtProtoc = "1.0.3"
 
   }
 

@@ -82,12 +82,12 @@ object Fs2GrpcPlugin extends AutoPlugin {
   override def projectSettings: Seq[Def.Setting[_]] =
     List(
       fs2GrpcServiceSuffix := "Fs2Grpc",
-      fs2GrpcOutputPath := (sourceManaged in Compile).value / "fs2-grpc",
-      scalapbProtobufDirectory := (sourceManaged in Compile).value / "scalapb",
+      fs2GrpcOutputPath := (Compile / sourceManaged).value / "fs2-grpc",
+      scalapbProtobufDirectory := (Compile / sourceManaged).value / "scalapb",
       scalapbCodeGenerators := {
         Target(
           convertOptionsToScalapbGen(scalapbCodeGeneratorOptions.value.toSet),
-          (sourceManaged in Compile).value / "scalapb"
+          (Compile / sourceManaged).value / "scalapb"
         ) ::
           Option(
             Target(

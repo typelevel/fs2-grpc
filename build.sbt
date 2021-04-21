@@ -14,7 +14,7 @@ lazy val root = project
   .enablePlugins(GitVersioning, BuildInfoPlugin)
   .settings(
     sonatypeProfileName := "org.lyranthe",
-    skip in publish := true,
+    publish / skip := true,
     pomExtra in Global := {
       <url>https://github.com/fiadliel/fs2-grpc</url>
         <licenses>
@@ -56,7 +56,7 @@ lazy val `sbt-java-gen` = project
       sbtVersion,
       organization,
       "grpcVersion" -> versions.grpc,
-      "codeGeneratorName" -> (name in `java-gen`).value
+      "codeGeneratorName" -> (`java-gen` / name).value
     ),
     libraryDependencies += scalaPbCompiler,
     addSbtPlugin(sbtProtoc)

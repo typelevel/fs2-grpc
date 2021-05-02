@@ -26,6 +26,7 @@ import cats.syntax.all._
 import cats.effect.{Async, Resource}
 import cats.effect.std.Dispatcher
 import io.grpc._
+import fs2.grpc.client.ClientOptions
 
 trait GeneratedCompanion[Service[*[_], _]] {
 
@@ -34,33 +35,84 @@ trait GeneratedCompanion[Service[*[_], _]] {
   def client[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       channel: Channel,
+      mkMetadata: A => Metadata,
+      clientOptions: ClientOptions
+  ): Service[F, A]
+
+  def clientResource[F[_]: Async, A](
+      channel: Channel,
+      mkMetadata: A => Metadata,
+      clientOptions: ClientOptions
+  ): Resource[F, Service[F, A]] =
+    Dispatcher[F].map(client[F, A](_, channel, mkMetadata, clientOptions))
+
+  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
+  def client[F[_]: Async, A](
+      dispatcher: Dispatcher[F],
+      channel: Channel,
       f: A => Metadata,
       coFn: CallOptions => CallOptions = identity,
       errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
-  ): Service[F, A]
+  ): Service[F, A] =
+    client[F, A](
+      dispatcher,
+      channel,
+      f,
+      ClientOptions.default
+        .withCallOptionsFn(coFn)
+        .withErrorAdapter(Function.unlift(errorAdapter))
+    )
 
+  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
   final def clientResource[F[_]: Async, A](
       channel: Channel,
       f: A => Metadata,
       coFn: CallOptions => _root_.io.grpc.CallOptions = identity,
       errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
   ): Resource[F, Service[F, A]] =
-    Dispatcher[F].map(client[F, A](_, channel, f, coFn, errorAdapter))
+    clientResource[F, A](
+      channel,
+      f,
+      ClientOptions.default
+        .withCallOptionsFn(coFn)
+        .withErrorAdapter(Function.unlift(errorAdapter))
+    )
 
+  final def stub[F[_]: Async](
+      dispatcher: Dispatcher[F],
+      channel: Channel,
+      clientOptions: ClientOptions
+  ): Service[F, Metadata] =
+    client[F, Metadata](dispatcher, channel, (m: Metadata) => m, clientOptions)
+
+  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
   final def stub[F[_]: Async](
       dispatcher: Dispatcher[F],
       channel: Channel,
       callOptions: CallOptions = CallOptions.DEFAULT,
       errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
   ): Service[F, Metadata] =
-    client[F, Metadata](dispatcher, channel, identity, _ => callOptions, errorAdapter)
+    stub[F](
+      dispatcher,
+      channel,
+      ClientOptions.default
+        .withCallOptionsFn((_: CallOptions) => callOptions)
+        .withErrorAdapter(Function.unlift(errorAdapter))
+    )
 
+  final def stubResource[F[_]: Async](
+      channel: Channel,
+      clientOptions: ClientOptions
+  ): Resource[F, Service[F, Metadata]] =
+    clientResource[F, Metadata](channel, (m: Metadata) => m, clientOptions)
+
+  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
   final def stubResource[F[_]: Async](
       channel: Channel,
       callOptions: CallOptions = CallOptions.DEFAULT,
       errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
   ): Resource[F, Service[F, Metadata]] =
-    clientResource[F, Metadata](channel, identity, _ => callOptions, errorAdapter)
+    clientResource[F, Metadata](channel, (m: Metadata) => m, (_: CallOptions) => callOptions, errorAdapter)
 
 ///=== Service =========================================================================================================
 

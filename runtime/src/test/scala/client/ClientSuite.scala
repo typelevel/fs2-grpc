@@ -34,7 +34,7 @@ import io.grpc._
 class ClientSuite extends Fs2GrpcSuite {
 
   private def fs2ClientCall(dummy: DummyClientCall, d: Dispatcher[IO]) =
-    new Fs2ClientCall[IO, String, Int](dummy, d, _ => None)
+    new Fs2ClientCall[IO, String, Int](dummy, d, ClientOptions.default)
 
   runTest0("single message to unaryToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
@@ -189,7 +189,7 @@ class ClientSuite extends Fs2GrpcSuite {
     tc.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 4)
+    assertEquals(dummy.requested, 3)
 
   }
 
@@ -215,9 +215,7 @@ class ClientSuite extends Fs2GrpcSuite {
 
     assertEquals(result.value, Some(Success(List(1, 2))))
     assertEquals(dummy.messagesSent.size, 1)
-
-    // One initial when starting listener + two for take(2)
-    assertEquals(dummy.requested, 3)
+    assertEquals(dummy.requested, 2)
   }
 
   runTest0("stream to streamingToStreaming") { (tc, io, d) =>
@@ -245,7 +243,7 @@ class ClientSuite extends Fs2GrpcSuite {
     tc.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 5)
-    assertEquals(dummy.requested, 4)
+    assertEquals(dummy.requested, 3)
 
   }
 
@@ -310,7 +308,7 @@ class ClientSuite extends Fs2GrpcSuite {
       Status.INTERNAL
     )
     assertEquals(dummy.messagesSent.size, 5)
-    assertEquals(dummy.requested, 4)
+    assertEquals(dummy.requested, 3)
 
   }
 
@@ -332,26 +330,26 @@ class ClientSuite extends Fs2GrpcSuite {
 
       def testAdapter(call: Fs2ClientCall[IO, String, Int] => IO[Unit]): Unit = {
 
-        val (status, errorMsg) =
+        val (status, errMsg) =
           if (shouldAdapt) (Status.ABORTED, "OhNoes!")
           else {
             (Status.INVALID_ARGUMENT, Status.INVALID_ARGUMENT.asRuntimeException().getMessage)
           }
 
-        val adapter: StatusRuntimeException => Option[Exception] = _.getStatus match {
-          case Status.ABORTED if shouldAdapt => Some(new RuntimeException(errorMsg))
-          case _ => None
+        val adapter: PartialFunction[StatusRuntimeException, Exception] = {
+          case e: StatusRuntimeException if e.getStatus == Status.ABORTED && shouldAdapt => new RuntimeException(errMsg)
         }
 
         val dummy = new DummyClientCall()
-        val client = new Fs2ClientCall[IO, String, Int](dummy, d, adapter)
+        val options = ClientOptions.default.withErrorAdapter(adapter)
+        val client = new Fs2ClientCall[IO, String, Int](dummy, d, options)
         val result = call(client).unsafeToFuture()(io)
 
         tc.tick()
         dummy.listener.get.onClose(status, new Metadata())
         tc.tick()
 
-        assertEquals(result.value.get.failed.get.getMessage, errorMsg)
+        assertEquals(result.value.get.failed.get.getMessage, errMsg)
         tc.tickAll()
       }
 

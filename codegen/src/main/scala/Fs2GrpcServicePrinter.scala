@@ -58,7 +58,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def createClientCall(method: MethodDescriptor) = {
     val basicClientCall =
-      s"$Fs2ClientCall[F](channel, ${method.grpcDescriptor.fullName}, $CallOptionsFnName($CallOptions.DEFAULT), dispatcher, $ErrorAdapterName)"
+      s"$Fs2ClientCall[F](channel, ${method.grpcDescriptor.fullName}, dispatcher, clientOptions)"
     if (method.isServerStreaming)
       s"$Stream.eval($basicClientCall)"
     else
@@ -69,7 +69,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     p.add(serviceMethodSignature(method) + " = {")
       .indent
       .add(
-        s"${createClientCall(method)}.flatMap(_.${handleMethod(method)}(request, mkMeta(ctx)))"
+        s"${createClientCall(method)}.flatMap(_.${handleMethod(method)}(request, mkMetadata(ctx)))"
       )
       .outdent
       .add("}")
@@ -113,7 +113,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceClient: PrinterEndo = {
     _.add(
-      s"def client[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, mkMeta: $Ctx => $Metadata, $CallOptionsFnDefault, $ErrorAdapterDefault): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
+      s"def client[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, mkMetadata: $Ctx => $Metadata, clientOptions: $ClientOptions): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
     ).indent
       .call(serviceMethodImplementations)
       .outdent
@@ -143,7 +143,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
 object Fs2GrpcServicePrinter {
 
-  object constants {
+  private[codegen] object constants {
 
     private val effPkg = "_root_.cats.effect"
     private val fs2Pkg = "_root_.fs2"
@@ -161,16 +161,10 @@ object Fs2GrpcServicePrinter {
 
     val Fs2ServerCallHandler = s"$fs2grpcPkg.server.Fs2ServerCallHandler"
     val Fs2ClientCall = s"$fs2grpcPkg.client.Fs2ClientCall"
+    val ClientOptions = s"$fs2grpcPkg.client.ClientOptions"
     val Companion = s"$fs2grpcPkg.GeneratedCompanion"
 
-    val ErrorAdapter = s"$grpcPkg.StatusRuntimeException => Option[Exception]"
-    val ErrorAdapterName = "errorAdapter"
-    val ErrorAdapterDefault = s"$ErrorAdapterName: $ErrorAdapter = _ => None"
-
     val ServerServiceDefinition = s"$grpcPkg.ServerServiceDefinition"
-    val CallOptions = s"$grpcPkg.CallOptions"
-    val CallOptionsFnName = "coFn"
-    val CallOptionsFnDefault = s"$CallOptionsFnName: $CallOptions => $CallOptions = identity"
     val Channel = s"$grpcPkg.Channel"
     val Metadata = s"$grpcPkg.Metadata"
 

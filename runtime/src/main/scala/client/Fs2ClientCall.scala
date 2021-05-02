@@ -34,11 +34,11 @@ final case class GrpcStatus(status: Status, trailers: Metadata)
 class Fs2ClientCall[F[_], Request, Response] private[client] (
     call: ClientCall[Request, Response],
     dispatcher: Dispatcher[F],
-    errorAdapter: StatusRuntimeException => Option[Exception]
+    options: ClientOptions
 )(implicit F: Async[F]) {
 
   private val ea: PartialFunction[Throwable, Throwable] = { case e: StatusRuntimeException =>
-    errorAdapter(e).getOrElse(e)
+    options.errorAdapter.lift(e).getOrElse(e)
   }
 
   private def cancel(message: Option[String], cause: Option[Throwable]): F[Unit] =
@@ -53,11 +53,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   private def sendMessage(message: Request): F[Unit] =
     F.delay(call.sendMessage(message))
 
-  private def start(listener: ClientCall.Listener[Response], md: Metadata): F[Unit] =
-    F.delay(call.start(listener, md))
-
-  private def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], md: Metadata): F[A] =
-    createListener.flatTap(start(_, md)) <* request(1)
+  private def start[A <: ClientCall.Listener[Response]](createListener: F[A], md: Metadata): F[A] =
+    createListener.flatTap(l => F.delay(call.start(l, md)))
 
   private def sendSingleMessage(message: Request): F[Unit] =
     sendMessage(message) *> halfClose
@@ -99,16 +96,21 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     case (_, Resource.ExitCase.Errored(t)) => cancel(t.getMessage.some, t.some)
   }
 
-  private def mkUnaryListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] =
-    Resource.makeCase(
-      startListener(Fs2UnaryClientCallListener.create[F, Response](dispatcher), md)
-    )(handleExitCase(cancelSucceed = false))
+  private def mkUnaryListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] = {
 
-  private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] =
-    Resource.makeCase(
-      startListener(Fs2StreamClientCallListener.create[F, Response](request, dispatcher), md)
-    )(handleExitCase(cancelSucceed = true))
+    val acquire = start(Fs2UnaryClientCallListener.create[F, Response](dispatcher), md) <* request(1)
+    val release = handleExitCase(cancelSucceed = false)
 
+    Resource.makeCase(acquire)(release)
+  }
+
+  private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
+
+    val acquire = start(Fs2StreamClientCallListener.create[F, Response](request, dispatcher, options.prefetchN), md)
+    val release = handleExitCase(cancelSucceed = true)
+
+    Resource.makeCase(acquire)(release)
+  }
 }
 
 object Fs2ClientCall {
@@ -117,18 +119,34 @@ object Fs2ClientCall {
 
   class PartiallyAppliedClientCall[F[_]](val dummy: Boolean = false) extends AnyVal {
 
+    @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
     def apply[Request, Response](
         channel: Channel,
         methodDescriptor: MethodDescriptor[Request, Response],
         callOptions: CallOptions,
         dispatcher: Dispatcher[F],
         errorAdapter: StatusRuntimeException => Option[Exception]
+    )(implicit F: Async[F]): F[Fs2ClientCall[F, Request, Response]] =
+      apply[Request, Response](
+        channel,
+        methodDescriptor,
+        dispatcher,
+        ClientOptions.default
+          .withCallOptionsFn(_ => callOptions)
+          .withErrorAdapter(Function.unlift(errorAdapter))
+      )
+
+    def apply[Request, Response](
+        channel: Channel,
+        methodDescriptor: MethodDescriptor[Request, Response],
+        dispatcher: Dispatcher[F],
+        clientOptions: ClientOptions
     )(implicit F: Async[F]): F[Fs2ClientCall[F, Request, Response]] = {
       F.delay(
         new Fs2ClientCall(
-          channel.newCall[Request, Response](methodDescriptor, callOptions),
+          channel.newCall[Request, Response](methodDescriptor, clientOptions.callOptionsFn(CallOptions.DEFAULT)),
           dispatcher,
-          errorAdapter
+          clientOptions
         )
       )
     }

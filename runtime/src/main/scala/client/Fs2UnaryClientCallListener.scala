@@ -68,12 +68,6 @@ class Fs2UnaryClientCallListener[F[_], Response] private (
 
 object Fs2UnaryClientCallListener {
 
-  @deprecated("Internal API. Will be removed from public API.", "1.1.4")
-  def apply[F[_]: Async, Response](
-      dispatcher: Dispatcher[F]
-  ): F[Fs2UnaryClientCallListener[F, Response]] =
-    create(dispatcher)
-
   private[client] def create[F[_]: Async, Response](
       dispatcher: Dispatcher[F]
   ): F[Fs2UnaryClientCallListener[F, Response]] =

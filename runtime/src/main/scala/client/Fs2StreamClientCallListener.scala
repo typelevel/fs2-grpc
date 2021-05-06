@@ -23,53 +23,34 @@ package fs2
 package grpc
 package client
 
-import cats.{Applicative, MonadThrow}
 import cats.implicits._
 import cats.effect.kernel.Concurrent
-import cats.effect.std.{Dispatcher, Queue}
+import cats.effect.std.Dispatcher
 import io.grpc.{ClientCall, Metadata, Status}
 
 class Fs2StreamClientCallListener[F[_], Response] private (
-    request: Int => F[Unit],
-    queue: Queue[F, Either[GrpcStatus, Response]],
+    ingest: StreamIngest[F, Response],
     dispatcher: Dispatcher[F]
-)(implicit F: MonadThrow[F])
-    extends ClientCall.Listener[Response] {
+) extends ClientCall.Listener[Response] {
 
   override def onMessage(message: Response): Unit =
-    dispatcher.unsafeRunSync(queue.offer(message.asRight))
+    dispatcher.unsafeRunSync(ingest.onMessage(message))
 
   override def onClose(status: Status, trailers: Metadata): Unit =
-    dispatcher.unsafeRunSync(queue.offer(GrpcStatus(status, trailers).asLeft))
+    dispatcher.unsafeRunSync(ingest.onClose(GrpcStatus(status, trailers)))
 
-  def stream: Stream[F, Response] = {
-
-    val run: F[Option[Response]] =
-      queue.take.flatMap {
-        case Right(v) => v.some.pure[F] <* request(1)
-        case Left(GrpcStatus(status, trailers)) =>
-          if (!status.isOk) F.raiseError(status.asRuntimeException(trailers))
-          else none[Response].pure[F]
-      }
-
-    Stream.repeatEval(run).unNoneTerminate
-  }
+  val stream: Stream[F, Response] = ingest.messages
 }
 
 object Fs2StreamClientCallListener {
 
-  @deprecated("Internal API. Will be removed from public API.", "1.1.4")
-  def apply[F[_]: Concurrent, Response](
-      request: Int => Unit,
-      dispatcher: Dispatcher[F]
-  ): F[Fs2StreamClientCallListener[F, Response]] =
-    create(request.andThen(Applicative[F].pure), dispatcher)
-
   private[client] def create[F[_]: Concurrent, Response](
       request: Int => F[Unit],
-      dispatcher: Dispatcher[F]
+      dispatcher: Dispatcher[F],
+      prefetchN: Int
   ): F[Fs2StreamClientCallListener[F, Response]] =
-    Queue.unbounded[F, Either[GrpcStatus, Response]].map { q =>
-      new Fs2StreamClientCallListener[F, Response](request, q, dispatcher)
-    }
+    StreamIngest[F, Response](request, prefetchN).map(
+      new Fs2StreamClientCallListener[F, Response](_, dispatcher)
+    )
+
 }

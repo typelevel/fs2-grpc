@@ -50,7 +50,7 @@ private[client] object StreamIngest {
   )(implicit F: Concurrent[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
 
     def onMessage(msg: T): F[Unit] =
-      decreaseDemandBy(1) *> queue.offer(msg.asRight) *> ensureMessages(prefetchN)
+      decreaseDemandBy(1) *> queue.offer(msg.asRight)
 
     def onClose(status: GrpcStatus): F[Unit] =
       queue.offer(status.asLeft)

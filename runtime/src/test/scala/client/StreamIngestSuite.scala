@@ -59,8 +59,8 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
         ingest <- StreamIngest[IO, Int](req => ref.update(_ + req), prefetchN)
         worker <- Stream
           .emits((1 to prefetchN))
-          .metered[IO](delay)
           .evalTap(ingest.onMessage)
+          .metered[IO](delay)
           .compile
           .drain
           .start
@@ -75,7 +75,7 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
 
     run(prefetchN = 5, takeN = 1, expectedReq = 5, expectedCount = 1, delay = 50.millis) *>
       run(prefetchN = 10, takeN = 5, expectedReq = 10, expectedCount = 5, delay = 50.millis) *>
-      run(prefetchN = 10, takeN = 10, expectedReq = 20, expectedCount = 10, delay = 50.millis)
+      run(prefetchN = 10, takeN = 10, expectedReq = 20, expectedCount = 10, delay = 300.millis)
 
   }
 

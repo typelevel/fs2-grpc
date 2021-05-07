@@ -59,7 +59,8 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
         ingest <- StreamIngest[IO, Int](req => ref.update(_ + req), prefetchN)
         worker <- Stream
           .emits((1 to prefetchN))
-          .evalTap(m => IO.sleep(delay) *> ingest.onMessage(m))
+          .metered[IO](delay)
+          .evalTap(ingest.onMessage)
           .compile
           .drain
           .start
@@ -72,9 +73,9 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
       }
     }
 
-    run(prefetchN = 5, takeN = 1, expectedReq = 5, expectedCount = 1, delay = 200.millis) *>
-      run(prefetchN = 10, takeN = 5, expectedReq = 10, expectedCount = 5, delay = 200.millis) *>
-      run(prefetchN = 10, takeN = 10, expectedReq = 20, expectedCount = 10, delay = 200.millis)
+    run(prefetchN = 5, takeN = 1, expectedReq = 5, expectedCount = 1, delay = 50.millis) *>
+      run(prefetchN = 10, takeN = 5, expectedReq = 10, expectedCount = 5, delay = 50.millis) *>
+      run(prefetchN = 10, takeN = 10, expectedReq = 20, expectedCount = 10, delay = 50.millis)
 
   }
 
@@ -90,7 +91,7 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
           .compile
           .drain
           .start
-        messages <- ingest.messages.evalTap(_ => IO.sleep(delay)).take(takeN.toLong).compile.toList
+        messages <- ingest.messages.take(takeN.toLong).metered(delay).compile.toList
         requested <- ref.get
         _ <- worker.cancel
       } yield {
@@ -99,9 +100,9 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
       }
     }
 
-    run(prefetchN = 5, takeN = 1, expectedReq = 5, expectedCount = 1, delay = 200.millis) *>
-      run(prefetchN = 10, takeN = 5, expectedReq = 10, expectedCount = 5, delay = 200.millis) *>
-      run(prefetchN = 10, takeN = 10, expectedReq = 20, expectedCount = 10, delay = 200.millis)
+    run(prefetchN = 5, takeN = 1, expectedReq = 5, expectedCount = 1, delay = 50.millis) *>
+      run(prefetchN = 10, takeN = 5, expectedReq = 10, expectedCount = 5, delay = 50.millis) *>
+      run(prefetchN = 10, takeN = 10, expectedReq = 20, expectedCount = 10, delay = 50.millis)
 
   }
 

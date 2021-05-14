@@ -2,7 +2,7 @@ import com.typesafe.tools.mima.core._
 import com.typesafe.tools.mima.core.ProblemFilters._
 import Dependencies._
 
-lazy val Scala3 = "3.0.0-RC3"
+lazy val Scala3 = "3.0.0"
 lazy val Scala213 = "2.13.5"
 lazy val Scala212 = "2.12.13"
 
@@ -15,7 +15,7 @@ def dev(ghUser: String, name: String, email: String): Developer =
 
 inThisBuild(
   List(
-    scalaVersion := Scala213,
+    scalaVersion := Scala3,
     crossScalaVersions := List(Scala3, Scala213, Scala212),
     baseVersion := "1.0",
     versionIntroduced := Map(

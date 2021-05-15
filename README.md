@@ -55,13 +55,15 @@ val managedChannelResource: Resource[IO, ManagedChannel] =
 
 The syntax also offers the method `resourceWithShutdown` which takes a function `ManagedChannel => F[Unit]` which is used to manage the shutdown. This may be used where requirements before shutdown do not match the default behaviour.
 
-The generated code provides a method `stubResource[F]`, for any `F` which has a `Async` instance, and it takes a parameter of type `Channel`. It returns a `Resource` with an implementation of the service (in a trait), which can be used to make calls.
+The generated code provides a method `stubResource[F]`, for any `F` which has a `Async` instance, and it takes a parameter of type `Channel` and `ClientOptions`. It returns a `Resource` with an implementation of the service (in a trait), which can be used to make calls.
 
 ```scala
+import fs2.grpc.client.ClientOptions
+
 def runProgram(stub: MyFs2Grpc[IO]): IO[Unit] = ???
 
 val run: IO[Unit] = managedChannelResource
-  .flatMap(ch => MyFs2Grpc.stubResource[IO](ch))
+  .flatMap(ch => MyFs2Grpc.stubResource[IO](ch, ClientOptions.default))
   .use(runProgram)
 ```
 
@@ -76,15 +78,16 @@ libraryDependencies += "io.grpc" % "grpc-netty-shaded" % scalapb.compiler.Versio
 
 ## Creating a server
 
-The generated code provides a method `bindServiceResource[F]`, for any `F` which has a `Async` instance, and it takes an implementation of the service (in a trait), which is used to serve responses to RPC calls. It returns a `Resource[F, ServerServiceDefinition]` which is given to the server builder when setting up the service.
+The generated code provides a method `bindServiceResource[F]`, for any `F` which has a `Async` instance, and it takes an implementation of the service (in a trait) and `ServerOptions`, which is used to serve responses to RPC calls. It returns a `Resource[F, ServerServiceDefinition]` which is given to the server builder when setting up the service.
 
 A `Server` is the type used by `grpc-java` to manage the server connections and lifecycle. This library provides syntax for `ServerBuilder`, which mirrors the pattern for the client. An example is:
 
 ```scala
 import fs2.grpc.syntax.all._
+import fs2.grpc.server.ServerOptions
 
 val helloService: Resource[IO, ServerServiceDefinition] = 
-  MyFs2Grpc.bindServiceResource[IO](new MyImpl())
+  MyFs2Grpc.bindServiceResource[IO](new MyImpl(), ServerOptions.default)
 
 def run(service: ServerServiceDefinition) = ServerBuilder
   .forPort(9999)

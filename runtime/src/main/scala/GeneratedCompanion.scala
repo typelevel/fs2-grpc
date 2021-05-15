@@ -27,6 +27,7 @@ import cats.effect.{Async, Resource}
 import cats.effect.std.Dispatcher
 import io.grpc._
 import fs2.grpc.client.ClientOptions
+import fs2.grpc.server.ServerOptions
 
 trait GeneratedCompanion[Service[*[_], _]] {
 
@@ -46,38 +47,6 @@ trait GeneratedCompanion[Service[*[_], _]] {
   ): Resource[F, Service[F, A]] =
     Dispatcher[F].map(client[F, A](_, channel, mkMetadata, clientOptions))
 
-  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
-  def client[F[_]: Async, A](
-      dispatcher: Dispatcher[F],
-      channel: Channel,
-      f: A => Metadata,
-      coFn: CallOptions => CallOptions = identity,
-      errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
-  ): Service[F, A] =
-    client[F, A](
-      dispatcher,
-      channel,
-      f,
-      ClientOptions.default
-        .withCallOptionsFn(coFn)
-        .withErrorAdapter(Function.unlift(errorAdapter))
-    )
-
-  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
-  final def clientResource[F[_]: Async, A](
-      channel: Channel,
-      f: A => Metadata,
-      coFn: CallOptions => _root_.io.grpc.CallOptions = identity,
-      errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
-  ): Resource[F, Service[F, A]] =
-    clientResource[F, A](
-      channel,
-      f,
-      ClientOptions.default
-        .withCallOptionsFn(coFn)
-        .withErrorAdapter(Function.unlift(errorAdapter))
-    )
-
   final def stub[F[_]: Async](
       dispatcher: Dispatcher[F],
       channel: Channel,
@@ -85,47 +54,26 @@ trait GeneratedCompanion[Service[*[_], _]] {
   ): Service[F, Metadata] =
     client[F, Metadata](dispatcher, channel, (m: Metadata) => m, clientOptions)
 
-  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
-  final def stub[F[_]: Async](
-      dispatcher: Dispatcher[F],
-      channel: Channel,
-      callOptions: CallOptions = CallOptions.DEFAULT,
-      errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
-  ): Service[F, Metadata] =
-    stub[F](
-      dispatcher,
-      channel,
-      ClientOptions.default
-        .withCallOptionsFn((_: CallOptions) => callOptions)
-        .withErrorAdapter(Function.unlift(errorAdapter))
-    )
-
   final def stubResource[F[_]: Async](
       channel: Channel,
       clientOptions: ClientOptions
   ): Resource[F, Service[F, Metadata]] =
     clientResource[F, Metadata](channel, (m: Metadata) => m, clientOptions)
 
-  @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
-  final def stubResource[F[_]: Async](
-      channel: Channel,
-      callOptions: CallOptions = CallOptions.DEFAULT,
-      errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
-  ): Resource[F, Service[F, Metadata]] =
-    clientResource[F, Metadata](channel, (m: Metadata) => m, (_: CallOptions) => callOptions, errorAdapter)
-
 ///=== Service =========================================================================================================
 
   protected def serviceBinding[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       serviceImpl: Service[F, A],
-      mkCtx: Metadata => F[A]
+      mkCtx: Metadata => F[A],
+      serverOptions: ServerOptions
   ): ServerServiceDefinition
 
   final def service[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       serviceImpl: Service[F, A],
-      f: Metadata => F[A]
+      f: Metadata => F[A],
+      serverOptions: ServerOptions
   ): ServerServiceDefinition = {
 
     val mkCtx: Metadata => F[A] = f(_).handleErrorWith {
@@ -134,25 +82,28 @@ trait GeneratedCompanion[Service[*[_], _]] {
       case e: Throwable => Status.INTERNAL.withDescription(e.getMessage).asRuntimeException().raiseError[F, A]
     }
 
-    serviceBinding[F, A](dispatcher, serviceImpl, mkCtx)
+    serviceBinding[F, A](dispatcher, serviceImpl, mkCtx, serverOptions)
   }
 
   final def serviceResource[F[_]: Async, A](
       serviceImpl: Service[F, A],
-      f: Metadata => F[A]
+      f: Metadata => F[A],
+      serverOptions: ServerOptions
   ): Resource[F, ServerServiceDefinition] =
-    Dispatcher[F].map(service[F, A](_, serviceImpl, f))
+    Dispatcher[F].map(service[F, A](_, serviceImpl, f, serverOptions))
 
   final def bindService[F[_]: Async](
       dispatcher: Dispatcher[F],
-      serviceImpl: Service[F, Metadata]
+      serviceImpl: Service[F, Metadata],
+      serverOptions: ServerOptions
   ): ServerServiceDefinition =
-    service[F, Metadata](dispatcher, serviceImpl, _.pure[F])
+    service[F, Metadata](dispatcher, serviceImpl, (md: Metadata) => md.pure[F], serverOptions)
 
   final def bindServiceResource[F[_]: Async](
-      serviceImpl: Service[F, Metadata]
+      serviceImpl: Service[F, Metadata],
+      serverOptions: ServerOptions
   ): Resource[F, ServerServiceDefinition] =
-    serviceResource[F, Metadata](serviceImpl, _.pure[F])
+    serviceResource[F, Metadata](serviceImpl, (md: Metadata) => md.pure[F], serverOptions)
 
 ///=====================================================================================================================
 

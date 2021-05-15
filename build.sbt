@@ -63,7 +63,50 @@ inThisBuild(
       exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2StreamClientCallListener.create"),
       // Removing deprecated internal methods
       exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2StreamClientCallListener.apply"),
-      exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2UnaryClientCallListener.apply")
+      exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2UnaryClientCallListener.apply"),
+      // Making it to 2.0
+      exclude[ReversedMissingMethodProblem]("fs2.grpc.GeneratedCompanion.serviceBinding"),
+      exclude[DirectMissingMethodProblem]("fs2.grpc.GeneratedCompanion.*"),
+      exclude[DirectMissingMethodProblem]("fs2.grpc.server.ServerCallOptions.*"),
+      exclude[DirectMissingMethodProblem]("fs2.grpc.client.Fs2ClientCall#PartiallyAppliedClientCall.apply"),
+      exclude[DirectMissingMethodProblem](
+        "fs2.grpc.server.Fs2StreamServerCallListener#PartialFs2StreamServerCallListener.apply$default$3$extension"
+      ),
+      exclude[DirectMissingMethodProblem](
+        "fs2.grpc.server.Fs2UnaryServerCallListener#PartialFs2UnaryServerCallListener.apply$default$3"
+      ),
+      exclude[DirectMissingMethodProblem](
+        "fs2.grpc.server.Fs2StreamServerCallListener#PartialFs2StreamServerCallListener.apply$default$3"
+      ),
+      exclude[DirectMissingMethodProblem](
+        "fs2.grpc.server.Fs2UnaryServerCallListener#PartialFs2UnaryServerCallListener.apply$default$3$extension"
+      ),
+      exclude[IncompatibleMethTypeProblem]("fs2.grpc.server.Fs2ServerCall.*"),
+      exclude[DirectMissingMethodProblem]("fs2.grpc.server.Fs2ServerCallHandler.*"),
+      exclude[IncompatibleMethTypeProblem](
+        "fs2.grpc.server.Fs2StreamServerCallListener#PartialFs2StreamServerCallListener.apply$extension"
+      ),
+      exclude[IncompatibleResultTypeProblem](
+        "fs2.grpc.server.Fs2StreamServerCallListener#PartialFs2StreamServerCallListener.apply$default$3$extension"
+      ),
+      exclude[IncompatibleMethTypeProblem](
+        "fs2.grpc.server.Fs2UnaryServerCallListener#PartialFs2UnaryServerCallListener.apply"
+      ),
+      exclude[IncompatibleResultTypeProblem](
+        "fs2.grpc.server.Fs2UnaryServerCallListener#PartialFs2UnaryServerCallListener.apply$default$3"
+      ),
+      exclude[IncompatibleMethTypeProblem](
+        "fs2.grpc.server.Fs2StreamServerCallListener#PartialFs2StreamServerCallListener.apply"
+      ),
+      exclude[IncompatibleResultTypeProblem](
+        "fs2.grpc.server.Fs2StreamServerCallListener#PartialFs2StreamServerCallListener.apply$default$3"
+      ),
+      exclude[IncompatibleMethTypeProblem](
+        "fs2.grpc.server.Fs2UnaryServerCallListener#PartialFs2UnaryServerCallListener.apply$extension"
+      ),
+      exclude[IncompatibleResultTypeProblem](
+        "fs2.grpc.server.Fs2UnaryServerCallListener#PartialFs2UnaryServerCallListener.apply$default$3$extension"
+      )
     )
   )
 )

@@ -23,11 +23,9 @@ package fs2
 package grpc
 package server
 
-import cats.syntax.all._
 import cats.effect._
 import io.grpc._
 
-// TODO: Add attributes, compression, message compression.
 private[server] class Fs2ServerCall[F[_], Request, Response](val call: ServerCall[Request, Response]) extends AnyVal {
   def sendHeaders(headers: Metadata)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.sendHeaders(headers))
@@ -46,9 +44,14 @@ private[server] object Fs2ServerCall {
 
   def apply[F[_]: Sync, Request, Response](
       call: ServerCall[Request, Response],
-      options: ServerCallOptions
-  ): F[Fs2ServerCall[F, Request, Response]] =
-    Sync[F]
-      .delay(options.compressor.map(_.name).foreach(call.setCompression))
-      .as(new Fs2ServerCall[F, Request, Response](call))
+      options: ServerOptions
+  ): F[Fs2ServerCall[F, Request, Response]] = Sync[F].delay {
+    val callOptions = options.callOptionsFn(ServerCallOptions.default)
+
+    call.setMessageCompression(callOptions.messageCompression)
+    callOptions.compressor.map(_.name).foreach(call.setCompression)
+
+    new Fs2ServerCall[F, Request, Response](call)
+  }
+
 }

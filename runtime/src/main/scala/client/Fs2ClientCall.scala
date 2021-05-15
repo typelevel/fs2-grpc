@@ -119,23 +119,6 @@ object Fs2ClientCall {
 
   class PartiallyAppliedClientCall[F[_]](val dummy: Boolean = false) extends AnyVal {
 
-    @deprecated("Will be removed from public API - use alternative overload.", "1.2.0")
-    def apply[Request, Response](
-        channel: Channel,
-        methodDescriptor: MethodDescriptor[Request, Response],
-        callOptions: CallOptions,
-        dispatcher: Dispatcher[F],
-        errorAdapter: StatusRuntimeException => Option[Exception]
-    )(implicit F: Async[F]): F[Fs2ClientCall[F, Request, Response]] =
-      apply[Request, Response](
-        channel,
-        methodDescriptor,
-        dispatcher,
-        ClientOptions.default
-          .withCallOptionsFn(_ => callOptions)
-          .withErrorAdapter(Function.unlift(errorAdapter))
-      )
-
     def apply[Request, Response](
         channel: Channel,
         methodDescriptor: MethodDescriptor[Request, Response],

@@ -7,8 +7,11 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 import io.grpc._
 
-class Fs2UnaryClientCallListener[F[_], Response](grpcStatus: Deferred[F, GrpcStatus], value: Ref[F, Option[Response]])(
-    implicit F: Effect[F]
+private[client] class Fs2UnaryClientCallListener[F[_], Response](
+    grpcStatus: Deferred[F, GrpcStatus],
+    value: Ref[F, Option[Response]]
+)(implicit
+    F: Effect[F]
 ) extends ClientCall.Listener[Response] {
 
   override def onClose(status: Status, trailers: Metadata): Unit =
@@ -41,7 +44,7 @@ class Fs2UnaryClientCallListener[F[_], Response](grpcStatus: Deferred[F, GrpcSta
   }
 }
 
-object Fs2UnaryClientCallListener {
+private[client] object Fs2UnaryClientCallListener {
 
   def apply[F[_]: ConcurrentEffect, Response]: F[Fs2UnaryClientCallListener[F, Response]] = {
     (Deferred[F, GrpcStatus], Ref.of[F, Option[Response]](none)).mapN((response, value) =>

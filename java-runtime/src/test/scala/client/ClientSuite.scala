@@ -15,7 +15,7 @@ import scala.util.Success
 object ClientSuite extends SimpleTestSuite {
 
   def fs2ClientCall(dummy: DummyClientCall) =
-    new Fs2ClientCall[IO, String, Int](dummy, _ => None)
+    new Fs2ClientCall[IO, String, Int](dummy, _ => None, 1)
 
   test("single message to unaryToUnary") {
 
@@ -187,7 +187,7 @@ object ClientSuite extends SimpleTestSuite {
     ec.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 4)
+    assertEquals(dummy.requested, 2)
   }
 
   test("single message to unaryToStreaming - back pressure") {
@@ -214,9 +214,7 @@ object ClientSuite extends SimpleTestSuite {
 
     assertEquals(result.value, Some(Success(List(1, 2))))
     assertEquals(dummy.messagesSent.size, 1)
-
-    // One initial when starting listener + two for take(2)
-    assertEquals(dummy.requested, 3)
+    assertEquals(dummy.requested, 1)
   }
 
   test("stream to streamingToStreaming") {
@@ -246,7 +244,7 @@ object ClientSuite extends SimpleTestSuite {
     ec.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 5)
-    assertEquals(dummy.requested, 4)
+    assertEquals(dummy.requested, 2)
   }
 
   test("cancellation for streamingToStreaming") {
@@ -316,7 +314,7 @@ object ClientSuite extends SimpleTestSuite {
       Status.INTERNAL
     )
     assertEquals(dummy.messagesSent.size, 5)
-    assertEquals(dummy.requested, 4)
+    assertEquals(dummy.requested, 2)
   }
 
   test("resource awaits termination of managed channel") {
@@ -352,7 +350,7 @@ object ClientSuite extends SimpleTestSuite {
         }
 
         val dummy = new DummyClientCall()
-        val client = new Fs2ClientCall[IO, String, Int](dummy, adapter)
+        val client = new Fs2ClientCall[IO, String, Int](dummy, adapter, 1)
         val result = call(client).unsafeToFuture()
 
         dummy.listener.get.onClose(status, new Metadata())

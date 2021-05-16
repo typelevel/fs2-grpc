@@ -12,7 +12,8 @@ final case class GrpcStatus(status: Status, trailers: Metadata)
 
 class Fs2ClientCall[F[_], Request, Response] private[client] (
     call: ClientCall[Request, Response],
-    errorAdapter: StatusRuntimeException => Option[Exception]
+    errorAdapter: StatusRuntimeException => Option[Exception],
+    prefetchN: Int
 ) {
 
   private val ea: PartialFunction[Throwable, Throwable] = { case e: StatusRuntimeException =>
@@ -36,8 +37,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   def startListener[A <: ClientCall.Listener[Response]](createListener: F[A], headers: Metadata)(implicit
       F: Sync[F]
-  ): F[A] =
-    createListener.flatTap(start(_, headers)) <* request(1)
+  ): F[A] = createListener.flatTap(start(_, headers))
 
   def sendSingleMessage(message: Request)(implicit F: Sync[F]): F[Unit] =
     sendMessage(message) *> halfClose
@@ -54,20 +54,20 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   }
 
   def unaryToUnaryCall(message: Request, headers: Metadata)(implicit F: ConcurrentEffect[F]): F[Response] =
-    F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers))(l =>
+    F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers) <* request(1))(l =>
       sendSingleMessage(message) *> l.getValue.adaptError(ea)
     )(handleExitCase(cancelComplete = false))
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata)(implicit
       F: ConcurrentEffect[F]
   ): F[Response] =
-    F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers))(l =>
+    F.bracketCase(startListener(Fs2UnaryClientCallListener[F, Response], headers) <* request(1))(l =>
       Stream.eval(l.getValue.adaptError(ea)).concurrently(sendStream(messages)).compile.lastOrError
     )(handleExitCase(cancelComplete = false))
 
   def unaryToStreamingCall(message: Request, headers: Metadata)(implicit F: ConcurrentEffect[F]): Stream[F, Response] =
     Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(
+      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](request, prefetchN), headers))(
         handleExitCase(cancelComplete = true)
       )
       .flatMap(Stream.eval_(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
@@ -76,13 +76,16 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       F: ConcurrentEffect[F]
   ): Stream[F, Response] =
     Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](call.request), headers))(
+      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](request, prefetchN), headers))(
         handleExitCase(cancelComplete = true)
       )
       .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))
 }
 
 object Fs2ClientCall {
+
+  val prefetchNKey: CallOptions.Key[Int] =
+    CallOptions.Key.createWithDefault[Int]("Fs2ClientCall.prefetchN", 1)
 
   def apply[F[_]]: PartiallyAppliedClientCall[F] = new PartiallyAppliedClientCall[F]
 
@@ -93,8 +96,9 @@ object Fs2ClientCall {
         methodDescriptor: MethodDescriptor[Request, Response],
         callOptions: CallOptions,
         errorAdapter: StatusRuntimeException => Option[Exception] = _ => None
-    )(implicit F: Sync[F]): F[Fs2ClientCall[F, Request, Response]] = {
-      F.delay(new Fs2ClientCall(channel.newCall[Request, Response](methodDescriptor, callOptions), errorAdapter))
+    )(implicit F: Sync[F]): F[Fs2ClientCall[F, Request, Response]] = F.delay {
+      val prefetchN = math.max(callOptions.getOption(prefetchNKey), 1)
+      new Fs2ClientCall(channel.newCall[Request, Response](methodDescriptor, callOptions), errorAdapter, prefetchN)
     }
 
   }

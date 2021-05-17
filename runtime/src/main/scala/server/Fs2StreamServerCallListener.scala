@@ -61,7 +61,7 @@ object Fs2StreamServerCallListener {
     private[server] def apply[Request, Response](
         call: ServerCall[Request, Response],
         dispatcher: Dispatcher[F],
-        options: ServerCallOptions = ServerCallOptions.default
+        options: ServerOptions
     )(implicit F: Async[F]): F[Fs2StreamServerCallListener[F, Request, Response]] = for {
       inputQ <- Queue.unbounded[F, Option[Request]]
       isCancelled <- Deferred[F, Unit]

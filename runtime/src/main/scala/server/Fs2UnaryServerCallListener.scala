@@ -80,7 +80,7 @@ object Fs2UnaryServerCallListener {
     private[server] def apply[Request, Response](
         call: ServerCall[Request, Response],
         dispatch: Dispatcher[F],
-        options: ServerCallOptions = ServerCallOptions.default
+        options: ServerOptions
     )(implicit F: Async[F]): F[Fs2UnaryServerCallListener[F, Request, Response]] = for {
       request <- Ref.of[F, Option[Request]](none)
       isComplete <- Deferred[F, Unit]

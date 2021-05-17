@@ -79,7 +79,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     val inType = method.inputType.scalaType
     val outType = method.outputType.scalaType
     val descriptor = method.grpcDescriptor.fullName
-    val handler = s"$Fs2ServerCallHandler[F](dispatcher).${handleMethod(method)}[$inType, $outType]"
+    val handler = s"$Fs2ServerCallHandler[F](dispatcher, serverOptions).${handleMethod(method)}[$inType, $outType]"
 
     val serviceCall = s"serviceImpl.${method.name}"
     val eval = if (method.isServerStreaming) s"$Stream.eval(mkCtx(m))" else "mkCtx(m)"
@@ -122,7 +122,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceBinding: PrinterEndo = {
     _.add(
-      s"protected def serviceBinding[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Ctx], mkCtx: $Metadata => F[$Ctx]): $ServerServiceDefinition = {"
+      s"protected def serviceBinding[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Ctx], mkCtx: $Metadata => F[$Ctx], serverOptions: $ServerOptions): $ServerServiceDefinition = {"
     ).indent
       .add(s"$ServerServiceDefinition")
       .call(serviceBindingImplementations)
@@ -162,6 +162,7 @@ object Fs2GrpcServicePrinter {
     val Fs2ServerCallHandler = s"$fs2grpcPkg.server.Fs2ServerCallHandler"
     val Fs2ClientCall = s"$fs2grpcPkg.client.Fs2ClientCall"
     val ClientOptions = s"$fs2grpcPkg.client.ClientOptions"
+    val ServerOptions = s"$fs2grpcPkg.server.ServerOptions"
     val Companion = s"$fs2grpcPkg.GeneratedCompanion"
 
     val ServerServiceDefinition = s"$grpcPkg.ServerServiceDefinition"

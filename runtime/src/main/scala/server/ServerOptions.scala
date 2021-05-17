@@ -23,17 +23,25 @@ package fs2
 package grpc
 package server
 
-sealed abstract class ServerCompressor(val name: String) extends Product with Serializable
-case object GzipCompressor extends ServerCompressor("gzip")
+sealed abstract class ServerOptions private (
+    val callOptionsFn: ServerCallOptions => ServerCallOptions
+) {
 
-abstract class ServerCallOptions private (val compressor: Option[ServerCompressor]) {
-  def copy(compressor: Option[ServerCompressor] = this.compressor): ServerCallOptions =
-    new ServerCallOptions(compressor) {}
+  private def copy(
+      callOptionsFn: ServerCallOptions => ServerCallOptions
+  ): ServerOptions = new ServerOptions(callOptionsFn) {}
 
-  def withServerCompressor(compressor: Option[ServerCompressor]): ServerCallOptions =
-    copy(compressor)
+  /** Function that is applied on `fs2.grpc.ServerCallOptions.default`
+    * for each new RPC call.
+    */
+  def withCallOptionsFn(fn: ServerCallOptions => ServerCallOptions): ServerOptions =
+    copy(callOptionsFn = fn)
 }
 
-object ServerCallOptions {
-  val default: ServerCallOptions = new ServerCallOptions(None) {}
+object ServerOptions {
+
+  val default: ServerOptions = new ServerOptions(
+    callOptionsFn = identity
+  ) {}
+
 }

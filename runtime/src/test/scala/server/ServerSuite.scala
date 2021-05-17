@@ -32,13 +32,14 @@ import io.grpc._
 
 class ServerSuite extends Fs2GrpcSuite {
 
-  private val compressionOps = ServerCallOptions.default.withServerCompressor(Some(GzipCompressor))
+  private val compressionOps =
+    ServerOptions.default.withCallOptionsFn(_.withServerCompressor(Some(GzipCompressor)))
 
   runTest("single message to unaryToUnary")(singleUnaryToUnary())
   runTest("single message to unaryToUnary with compression")(singleUnaryToUnary(compressionOps))
 
   private[this] def singleUnaryToUnary(
-      options: ServerCallOptions = ServerCallOptions.default
+      options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
 
@@ -56,7 +57,7 @@ class ServerSuite extends Fs2GrpcSuite {
 
   runTest("cancellation for unaryToUnary") { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2UnaryServerCallListener[IO](dummy, d).unsafeRunSync()
+    val listener = Fs2UnaryServerCallListener[IO](dummy, d, ServerOptions.default).unsafeRunSync()
 
     listener.unsafeUnaryResponse(new Metadata(), _.map(_.length))
 
@@ -76,7 +77,7 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("multiple messages to unaryToUnary with compression")(multipleUnaryToUnary(compressionOps))
 
   private def multipleUnaryToUnary(
-      options: ServerCallOptions = ServerCallOptions.default
+      options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
     val listener = Fs2UnaryServerCallListener[IO](dummy, d, options).unsafeRunSync()
@@ -111,7 +112,7 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("single message to unaryToStreaming with compression")(singleUnaryToStreaming(compressionOps))
 
   private def singleUnaryToStreaming(
-      options: ServerCallOptions = ServerCallOptions.default
+      options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
     val listener = Fs2UnaryServerCallListener[IO][String, Int](dummy, d, options).unsafeRunSync()
@@ -129,7 +130,7 @@ class ServerSuite extends Fs2GrpcSuite {
 
   runTest("zero messages to streamingToStreaming") { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d, ServerOptions.default).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _ => Stream.emit(3).repeat.take(5))
     listener.onHalfClose()
@@ -143,7 +144,7 @@ class ServerSuite extends Fs2GrpcSuite {
 
   runTest("cancellation for streamingToStreaming") { (tc, d) =>
     val dummy = new DummyServerCall
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d, ServerOptions.default).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _ => Stream.emit(3).repeat.take(5))
     listener.onCancel()
@@ -158,7 +159,7 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("messages to streamingToStreaming with compression")(multipleStreamingToStreaming(compressionOps))
 
   private def multipleStreamingToStreaming(
-      options: ServerCallOptions = ServerCallOptions.default
+      options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
     val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d, options).unsafeRunSync()
@@ -178,7 +179,7 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("messages to streamingToStreaming with error") { (tc, d) =>
     val dummy = new DummyServerCall
     val error = new RuntimeException("hello")
-    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d).unsafeRunSync()
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, d, ServerOptions.default).unsafeRunSync()
 
     listener.unsafeStreamResponse(new Metadata(), _.map(_.length) ++ Stream.emit(0) ++ Stream.raiseError[IO](error))
     listener.onMessage("a")
@@ -197,7 +198,7 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("streaming to unary with compression")(streamingToUnary(compressionOps))
 
   private def streamingToUnary(
-      so: ServerCallOptions = ServerCallOptions.default
+      so: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val implementation: Stream[IO, String] => IO[Int] =
       _.compile.foldMonoid.map(_.length)

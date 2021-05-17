@@ -43,10 +43,10 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
       }
     }
 
-    run(prefetchN = 1, takeN = 1, expectedReq = 2 /* queue becomes empty */, expectedCount = 1) *>
-      run(prefetchN = 2, takeN = 1, expectedReq = 2, expectedCount = 1) *>
-      run(prefetchN = 1024, takeN = 1024, expectedReq = 2048 /* queue becomes empty */, expectedCount = 1024) *>
-      run(prefetchN = 1024, takeN = 1023, expectedReq = 1024, expectedCount = 1023)
+    run(prefetchN = 1, takeN = 1, expectedReq = 1, expectedCount = 1) *>
+      run(prefetchN = 2, takeN = 1, expectedReq = 0, expectedCount = 1) *>
+      run(prefetchN = 1024, takeN = 1024, expectedReq = 1024, expectedCount = 1024) *>
+      run(prefetchN = 1024, takeN = 1023, expectedReq = 0, expectedCount = 1023)
 
   }
 

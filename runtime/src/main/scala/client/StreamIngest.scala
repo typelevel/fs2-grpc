@@ -40,7 +40,7 @@ private[client] object StreamIngest {
       prefetchN: Int
   ): F[StreamIngest[F, T]] =
     (Concurrent[F].ref(prefetchN), Queue.unbounded[F, Either[GrpcStatus, T]])
-      .mapN((d, q) => create[F, T](request, prefetchN, d, q)) <* request(prefetchN)
+      .mapN((d, q) => create[F, T](request, prefetchN, d, q))
 
   def create[F[_], T](
       request: Int => F[Unit],

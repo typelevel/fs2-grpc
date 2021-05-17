@@ -33,7 +33,7 @@ import io.grpc._
 class ServerSuite extends Fs2GrpcSuite {
 
   private val compressionOps =
-    ServerOptions.default.withCallOptionsFn(_.withServerCompressor(Some(GzipCompressor)))
+    ServerOptions.default.configureCallOptions(_.withServerCompressor(Some(GzipCompressor)))
 
   runTest("single message to unaryToUnary")(singleUnaryToUnary())
   runTest("single message to unaryToUnary with compression")(singleUnaryToUnary(compressionOps))

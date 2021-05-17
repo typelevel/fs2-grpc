@@ -55,7 +55,7 @@ sealed abstract class ClientOptions private (
   /** Function that is applied on `io.grpc.CallOptions.DEFAULT`
     * for each new RPC call.
     */
-  def withCallOptionsFn(fn: CallOptions => CallOptions): ClientOptions =
+  def configureCallOptions(fn: CallOptions => CallOptions): ClientOptions =
     copy(callOptionsFn = fn)
 
 }

@@ -42,13 +42,14 @@ lazy val server =
 
 ## Creating a client
 
-A `ManagedChannel` is the type used by `grpc-java` to manage a connection to a particular server. This library provides syntax for `ManagedChannelBuilder` which creates a `Resource` which can manage the shutdown of the channel, by calling `.resource[F]` where `F` has an instance of the `Sync` typeclass. This implementation will do a drain of the channel, and attempt to shut down the channel, forcefully closing after 30 seconds. An example of the syntax is:
+A `ManagedChannel` is the type used by `grpc-java` to manage a connection to a particular server. This library provides syntax for `ManagedChannelBuilder` which creates a `Resource` which can manage the shutdown of the channel, by calling `.resource[F]` where `F` has an instance of the `Sync` typeclass. This implementation will do a drain of the channel, and attempt to shut down the channel, forcefully closing after 30 seconds. An example of the syntax using `grpc-netty` is:
 
 ```scala
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder
 import fs2.grpc.syntax.all._
 
 val managedChannelResource: Resource[IO, ManagedChannel] =
-  ManagedChannelBuilder
+  NettyChannelBuilder
     .forAddress("127.0.0.1", 9999)
     .resource[IO]
 ```
@@ -67,13 +68,13 @@ val run: IO[Unit] = managedChannelResource
   .use(runProgram)
 ```
 
-If a `ManagedChannelProvider` isn't found on your classpath you may receive an error similar to 
-```
-io.grpc.ManagedChannelProvider$ProviderNotFoundException: No functional channel service provider found. Try adding a dependency on the grpc-okhttp or grpc-netty artifact
-```
-This can be fixed by adding a dependency to the [netty provider](https://github.com/grpc/grpc-java#transport) e.g.
+Adding a dependency on `grpc-netty` can be done as follows:
 ```
 libraryDependencies += "io.grpc" % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion
+```
+and for `grpc-okhttp`:
+```
+libraryDependencies += "io.grpc" % "grpc-okhttp" % scalapb.compiler.Version.grpcJavaVersion
 ```
 
 ## Creating a server
@@ -83,13 +84,14 @@ The generated code provides a method `bindServiceResource[F]`, for any `F` which
 A `Server` is the type used by `grpc-java` to manage the server connections and lifecycle. This library provides syntax for `ServerBuilder`, which mirrors the pattern for the client. An example is:
 
 ```scala
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import fs2.grpc.syntax.all._
 import fs2.grpc.server.ServerOptions
 
 val helloService: Resource[IO, ServerServiceDefinition] = 
   MyFs2Grpc.bindServiceResource[IO](new MyImpl(), ServerOptions.default)
 
-def run(service: ServerServiceDefinition) = ServerBuilder
+def run(service: ServerServiceDefinition) = NettyServerBuilder
   .forPort(9999)
   .addService(service)
   .resource[IO]

@@ -40,12 +40,25 @@ trait GeneratedCompanion[Service[*[_], _]] {
       clientOptions: ClientOptions
   ): Service[F, A]
 
-  def clientResource[F[_]: Async, A](
+  final def client[F[_]: Async, A](
+      dispatcher: Dispatcher[F],
+      channel: Channel,
+      mkMetadata: A => Metadata
+  ): Service[F, A] =
+    client[F, A](dispatcher, channel, mkMetadata, ClientOptions.default)
+
+  final def clientResource[F[_]: Async, A](
       channel: Channel,
       mkMetadata: A => Metadata,
       clientOptions: ClientOptions
   ): Resource[F, Service[F, A]] =
     Dispatcher[F].map(client[F, A](_, channel, mkMetadata, clientOptions))
+
+  final def clientResource[F[_]: Async, A](
+      channel: Channel,
+      mkMetadata: A => Metadata
+  ): Resource[F, Service[F, A]] =
+    clientResource[F, A](channel, mkMetadata, ClientOptions.default)
 
   final def stub[F[_]: Async](
       dispatcher: Dispatcher[F],
@@ -54,11 +67,22 @@ trait GeneratedCompanion[Service[*[_], _]] {
   ): Service[F, Metadata] =
     client[F, Metadata](dispatcher, channel, (m: Metadata) => m, clientOptions)
 
+  final def stub[F[_]: Async](
+      dispatcher: Dispatcher[F],
+      channel: Channel
+  ): Service[F, Metadata] =
+    stub[F](dispatcher, channel, ClientOptions.default)
+
   final def stubResource[F[_]: Async](
       channel: Channel,
       clientOptions: ClientOptions
   ): Resource[F, Service[F, Metadata]] =
     clientResource[F, Metadata](channel, (m: Metadata) => m, clientOptions)
+
+  final def stubResource[F[_]: Async](
+      channel: Channel
+  ): Resource[F, Service[F, Metadata]] =
+    stubResource[F](channel, ClientOptions.default)
 
 ///=== Service =========================================================================================================
 
@@ -85,12 +109,25 @@ trait GeneratedCompanion[Service[*[_], _]] {
     serviceBinding[F, A](dispatcher, serviceImpl, mkCtx, serverOptions)
   }
 
+  final def service[F[_]: Async, A](
+      dispatcher: Dispatcher[F],
+      serviceImpl: Service[F, A],
+      f: Metadata => F[A]
+  ): ServerServiceDefinition =
+    service[F, A](dispatcher, serviceImpl, f, ServerOptions.default)
+
   final def serviceResource[F[_]: Async, A](
       serviceImpl: Service[F, A],
       f: Metadata => F[A],
       serverOptions: ServerOptions
   ): Resource[F, ServerServiceDefinition] =
     Dispatcher[F].map(service[F, A](_, serviceImpl, f, serverOptions))
+
+  final def serviceResource[F[_]: Async, A](
+      serviceImpl: Service[F, A],
+      f: Metadata => F[A]
+  ): Resource[F, ServerServiceDefinition] =
+    serviceResource[F, A](serviceImpl, f, ServerOptions.default)
 
   final def bindService[F[_]: Async](
       dispatcher: Dispatcher[F],
@@ -99,11 +136,22 @@ trait GeneratedCompanion[Service[*[_], _]] {
   ): ServerServiceDefinition =
     service[F, Metadata](dispatcher, serviceImpl, (md: Metadata) => md.pure[F], serverOptions)
 
+  final def bindService[F[_]: Async](
+      dispatcher: Dispatcher[F],
+      serviceImpl: Service[F, Metadata]
+  ): ServerServiceDefinition =
+    bindService[F](dispatcher, serviceImpl, ServerOptions.default)
+
   final def bindServiceResource[F[_]: Async](
       serviceImpl: Service[F, Metadata],
       serverOptions: ServerOptions
   ): Resource[F, ServerServiceDefinition] =
     serviceResource[F, Metadata](serviceImpl, (md: Metadata) => md.pure[F], serverOptions)
+
+  final def bindServiceResource[F[_]: Async](
+      serviceImpl: Service[F, Metadata]
+  ): Resource[F, ServerServiceDefinition] =
+    bindServiceResource[F](serviceImpl, ServerOptions.default)
 
 ///=====================================================================================================================
 

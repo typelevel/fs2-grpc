@@ -15,6 +15,15 @@ addSbtPlugin("org.typelevel" % "sbt-fs2-grpc" % "<latest-version>")
 enablePlugins(Fs2Grpc)
 ```
 
+Depending if you wish to use `grpc-netty` or `grpc-okhttp`, add one of the following dependencies:
+```
+libraryDependencies += "io.grpc" % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion
+```
+or
+```
+libraryDependencies += "io.grpc" % "grpc-okhttp" % scalapb.compiler.Version.grpcJavaVersion
+```
+
 ## Protocol buffer files
 
 The protobuf files should be stored in the directory `<project_root>/src/main/protobuf`.
@@ -56,40 +65,31 @@ val managedChannelResource: Resource[IO, ManagedChannel] =
 
 The syntax also offers the method `resourceWithShutdown` which takes a function `ManagedChannel => F[Unit]` which is used to manage the shutdown. This may be used where requirements before shutdown do not match the default behaviour.
 
-The generated code provides a method `stubResource[F]`, for any `F` which has a `Async` instance, and it takes a parameter of type `Channel` and `ClientOptions`. It returns a `Resource` with an implementation of the service (in a trait), which can be used to make calls.
+The generated code provides a method `stubResource[F]`, for any `F` which has a `Async` instance, and it takes a parameter of type `Channel`. It returns a `Resource` with an implementation of the service (in a trait), which can be used to make calls.
+
+Moreover, the generated code provides method overloads that take `ClientOptions` used for configuring calls.
 
 ```scala
-import fs2.grpc.client.ClientOptions
 
 def runProgram(stub: MyFs2Grpc[IO]): IO[Unit] = ???
 
 val run: IO[Unit] = managedChannelResource
-  .flatMap(ch => MyFs2Grpc.stubResource[IO](ch, ClientOptions.default))
+  .flatMap(ch => MyFs2Grpc.stubResource[IO](ch))
   .use(runProgram)
-```
-
-Adding a dependency on `grpc-netty` can be done as follows:
-```
-libraryDependencies += "io.grpc" % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion
-```
-and for `grpc-okhttp`:
-```
-libraryDependencies += "io.grpc" % "grpc-okhttp" % scalapb.compiler.Version.grpcJavaVersion
 ```
 
 ## Creating a server
 
-The generated code provides a method `bindServiceResource[F]`, for any `F` which has a `Async` instance, and it takes an implementation of the service (in a trait) and `ServerOptions`, which is used to serve responses to RPC calls. It returns a `Resource[F, ServerServiceDefinition]` which is given to the server builder when setting up the service.
+The generated code provides a method `bindServiceResource[F]`, for any `F` which has a `Async` instance, and it takes an implementation of the service (in a trait), which is used to serve responses to RPC calls. It returns a `Resource[F, ServerServiceDefinition]` which is given to the server builder when setting up the service. Furthermore, the generated code provides method overloads that take `ServerOptions` used for configuring service calls.
 
 A `Server` is the type used by `grpc-java` to manage the server connections and lifecycle. This library provides syntax for `ServerBuilder`, which mirrors the pattern for the client. An example is:
 
 ```scala
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import fs2.grpc.syntax.all._
-import fs2.grpc.server.ServerOptions
 
 val helloService: Resource[IO, ServerServiceDefinition] = 
-  MyFs2Grpc.bindServiceResource[IO](new MyImpl(), ServerOptions.default)
+  MyFs2Grpc.bindServiceResource[IO](new MyImpl())
 
 def run(service: ServerServiceDefinition) = NettyServerBuilder
   .forPort(9999)

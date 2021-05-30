@@ -7,5 +7,3 @@ addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.3")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc-gen-project" % "0.1.7")
 libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.3"
-// TODO: Remove when sbt-spiewak does not use sbt-dotty
-addSbtPlugin("ch.epfl.lamp" % "sbt-dotty" % "0.5.5")

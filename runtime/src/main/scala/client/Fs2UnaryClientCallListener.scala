@@ -40,7 +40,7 @@ class Fs2UnaryClientCallListener[F[_], Response] private (
     dispatcher.unsafeRunSync(grpcStatus.complete(GrpcStatus(status, trailers)).void)
 
   override def onMessage(message: Response): Unit =
-    dispatcher.unsafeRunSync(value.set(message.some).void)
+    dispatcher.unsafeRunSync(value.set(message.some))
 
   def getValue: F[Response] = {
     for {

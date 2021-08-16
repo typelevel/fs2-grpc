@@ -7,9 +7,9 @@ object Dependencies {
     val grpc = scalapb.compiler.Version.grpcJavaVersion
     val scalaPb = scalapb.compiler.Version.scalapbVersion
 
-    val fs2 = "3.0.4"
-    val catsEffect = "3.1.1"
-    val ceMunit = "1.0.3"
+    val fs2 = "3.1.0"
+    val catsEffect = "3.2.2"
+    val ceMunit = "1.0.5"
 
     val sbtProtoc = "1.0.4"
 

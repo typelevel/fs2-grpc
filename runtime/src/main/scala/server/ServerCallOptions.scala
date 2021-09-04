@@ -37,15 +37,13 @@ sealed abstract class ServerCallOptions private (
   ): ServerCallOptions =
     new ServerCallOptions(compressor, messageCompression) {}
 
-  /** Enables per-message compression.  If no message encoding has been negotiated,
-    * this is a no-op. By default per-message compression is enabled,
-    * but may not have any effect if compression is not enabled on the call.
+  /** Enables per-message compression. If no message encoding has been negotiated, this is a no-op. By default
+    * per-message compression is enabled, but may not have any effect if compression is not enabled on the call.
     */
   def withMessageCompression(enabled: Boolean): ServerCallOptions =
     copy(messageCompression = enabled)
 
-  /** Sets the compression algorithm for a call. Default gRPC
-    * servers support the "gzip" compressor.
+  /** Sets the compression algorithm for a call. Default gRPC servers support the "gzip" compressor.
     */
   def withServerCompressor(sc: Option[ServerCompressor]): ServerCallOptions =
     copy(compressor = sc)

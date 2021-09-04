@@ -31,8 +31,7 @@ sealed abstract class ServerOptions private (
       callOptionsFn: ServerCallOptions => ServerCallOptions
   ): ServerOptions = new ServerOptions(callOptionsFn) {}
 
-  /** Function that is applied on `fs2.grpc.ServerCallOptions.default`
-    * for each new RPC call.
+  /** Function that is applied on `fs2.grpc.ServerCallOptions.default` for each new RPC call.
     */
   def configureCallOptions(fn: ServerCallOptions => ServerCallOptions): ServerOptions =
     copy(callOptionsFn = fn)

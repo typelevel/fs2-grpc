@@ -35,13 +35,11 @@ trait ServerBuilderSyntax {
 
 final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends AnyVal {
 
-  /** Builds a `Server` into a resource. The server is shut
-    * down when the resource is released. Shutdown is as follows:
+  /** Builds a `Server` into a resource. The server is shut down when the resource is released. Shutdown is as follows:
     *
-    * 1. We request an orderly shutdown, allowing preexisting calls to continue
-    *    without accepting new calls.
-    * 2. We block for up to 30 seconds on termination, using the blocking context
-    * 3. If the server is not yet terminated, we trigger a forceful shutdown
+    *   1. We request an orderly shutdown, allowing preexisting calls to continue without accepting new calls. 2. We
+    *      block for up to 30 seconds on termination, using the blocking context 3. If the server is not yet terminated,
+    *      we trigger a forceful shutdown
     *
     * For different tradeoffs in shutdown behavior, see {{resourceWithShutdown}}.
     */
@@ -56,35 +54,31 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
       }
     }
 
-  /** Builds a `Server` into a resource. The server is shut
-    * down when the resource is released.
+  /** Builds a `Server` into a resource. The server is shut down when the resource is released.
     *
-    * @param shutdown Determines the behavior of the cleanup of the
-    * server, with respect to forceful vs. graceful shutdown and how
-    * to poll or block for termination.
+    * @param shutdown
+    *   Determines the behavior of the cleanup of the server, with respect to forceful vs. graceful shutdown and how to
+    *   poll or block for termination.
     */
   def resourceWithShutdown[F[_]](shutdown: Server => F[Unit])(implicit F: Sync[F]): Resource[F, Server] =
     Resource.make(F.delay(builder.build()))(shutdown)
 
-  /** Builds a `Server` into a stream. The server is shut
-    * down when the stream is complete.  Shutdown is as follows:
+  /** Builds a `Server` into a stream. The server is shut down when the stream is complete. Shutdown is as follows:
     *
-    * 1. We request an orderly shutdown, allowing preexisting calls to continue
-    *    without accepting new calls.
-    * 2. We block for up to 30 seconds on termination, using the blocking context
-    * 3. If the server is not yet terminated, we trigger a forceful shutdown
+    *   1. We request an orderly shutdown, allowing preexisting calls to continue without accepting new calls. 2. We
+    *      block for up to 30 seconds on termination, using the blocking context 3. If the server is not yet terminated,
+    *      we trigger a forceful shutdown
     *
     * For different tradeoffs in shutdown behavior, see {{streamWithShutdown}}.
     */
   def stream[F[_]](implicit F: Async[F]): Stream[F, Server] =
     Stream.resource(resource[F])
 
-  /** Builds a `Server` into a stream. The server is shut
-    * down when the stream is complete.
+  /** Builds a `Server` into a stream. The server is shut down when the stream is complete.
     *
-    * @param shutdown Determines the behavior of the cleanup of the
-    * server, with respect to forceful vs. graceful shutdown and how
-    * to poll or block for termination.
+    * @param shutdown
+    *   Determines the behavior of the cleanup of the server, with respect to forceful vs. graceful shutdown and how to
+    *   poll or block for termination.
     */
   def streamWithShutdown[F[_]](shutdown: Server => F[Unit])(implicit F: Async[F]): Stream[F, Server] =
     Stream.resource(resourceWithShutdown(shutdown))

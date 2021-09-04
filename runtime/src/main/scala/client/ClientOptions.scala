@@ -38,9 +38,8 @@ sealed abstract class ClientOptions private (
   ): ClientOptions =
     new ClientOptions(prefetchN, callOptionsFn, errorAdapter) {}
 
-  /** Prefetch up to @param n messages from a server. The client will
-    * try to keep the internal buffer filled according to the provided
-    * value.
+  /** Prefetch up to @param n messages from a server. The client will try to keep the internal buffer filled according
+    * to the provided value.
     *
     * If the provided value is less than 1 it defaults to 1.
     */
@@ -52,8 +51,7 @@ sealed abstract class ClientOptions private (
   def withErrorAdapter(ea: PartialFunction[StatusRuntimeException, Exception]): ClientOptions =
     copy(errorAdapter = ea)
 
-  /** Function that is applied on `io.grpc.CallOptions.DEFAULT`
-    * for each new RPC call.
+  /** Function that is applied on `io.grpc.CallOptions.DEFAULT` for each new RPC call.
     */
   def configureCallOptions(fn: CallOptions => CallOptions): ClientOptions =
     copy(callOptionsFn = fn)

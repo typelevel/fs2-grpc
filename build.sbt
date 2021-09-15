@@ -4,7 +4,7 @@ import Dependencies._
 
 lazy val Scala3 = "3.0.2"
 lazy val Scala213 = "2.13.5"
-lazy val Scala212 = "2.12.14"
+lazy val Scala212 = "2.12.15"
 
 Global / lintUnusedKeysOnLoad := false
 

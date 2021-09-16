@@ -1,5 +1,5 @@
-addSbtPlugin("com.codecommit" % "sbt-spiewak" % "0.22.0")
-addSbtPlugin("com.codecommit" % "sbt-spiewak-sonatype" % "0.22.0")
+addSbtPlugin("com.codecommit" % "sbt-spiewak" % "0.22.1")
+addSbtPlugin("com.codecommit" % "sbt-spiewak-sonatype" % "0.22.1")
 
 addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.10.0")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.3")

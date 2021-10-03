@@ -149,6 +149,7 @@ class ServerSuite extends Fs2GrpcSuite {
     listener.unsafeStreamResponse(new Metadata(), _ => Stream.emit(3).repeat.take(5))
     listener.onCancel()
     tc.tickOne()
+    tc.tickOne()
 
     val cancelled = listener.isCancelled.get.unsafeToFuture()
     tc.tickAll()

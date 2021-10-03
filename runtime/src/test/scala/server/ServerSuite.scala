@@ -151,6 +151,7 @@ class ServerSuite extends Fs2GrpcSuite {
     tc.tickOne()
     tc.tickOne()
     tc.tickOne()
+    tc.tickOne()
 
     val cancelled = listener.isCancelled.get.unsafeToFuture()
     tc.tickAll()

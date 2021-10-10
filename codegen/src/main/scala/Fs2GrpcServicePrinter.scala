@@ -104,17 +104,12 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceObject: PrinterEndo =
     _.add(s"object $serviceNameFs2 extends $Companion[$serviceNameFs2] {").indent.newline
-      .call(serviceCompanion)
-      .newline
       .call(serviceClient)
       .newline
       .call(serviceBinding)
       .outdent
       .newline
       .add("}")
-
-  private[this] def serviceCompanion: PrinterEndo =
-    _.add(s"implicit def serviceCompanion: $Companion[$serviceNameFs2] = this")
 
   private[this] def serviceClient: PrinterEndo = {
     _.add(

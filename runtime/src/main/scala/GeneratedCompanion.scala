@@ -31,6 +31,8 @@ import fs2.grpc.server.ServerOptions
 
 trait GeneratedCompanion[Service[*[_], _]] {
 
+  implicit final def serviceCompanion: GeneratedCompanion[Service] = this
+
 ///=== Client ==========================================================================================================
 
   def client[F[_]: Async, A](

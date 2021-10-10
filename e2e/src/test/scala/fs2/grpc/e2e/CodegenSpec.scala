@@ -26,6 +26,7 @@ package e2e
 import java.io.File
 import scala.io.Source
 import buildinfo.BuildInfo.sourceManaged
+import hello.world._
 
 class Fs2CodeGeneratorSpec extends munit.FunSuite {
 
@@ -39,6 +40,10 @@ class Fs2CodeGeneratorSpec extends munit.FunSuite {
 
     assertEquals(generated, reference)
 
+  }
+
+  test("implicit of companion resolves") {
+    implicitly[GeneratedCompanion[TestServiceFs2Grpc]]
   }
 
 }

@@ -22,7 +22,7 @@
 package fs2
 package grpc
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.duration.FiniteDuration
 import cats.effect.IO
 import cats.effect.std.Dispatcher
@@ -31,6 +31,13 @@ import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
 import munit._
 
 class Fs2GrpcSuite extends CatsEffectSuite with CatsEffectFunFixtures {
+
+  private val parasiticExecutionContext = new ExecutionContext {
+    def execute(runnable: Runnable): Unit = runnable.run()
+    def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
+  }
+
+  override val munitExecutionContext: ExecutionContext = parasiticExecutionContext
 
   protected def createDeterministicRuntime: (TestContext, IORuntime) = {
 

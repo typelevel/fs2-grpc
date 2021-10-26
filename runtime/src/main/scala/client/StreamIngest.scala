@@ -24,7 +24,7 @@ package grpc
 package client
 
 import cats.implicits._
-import cats.effect.kernel.{Concurrent, Ref}
+import cats.effect.Concurrent
 import cats.effect.std.Queue
 
 private[client] trait StreamIngest[F[_], T] {
@@ -39,39 +39,33 @@ private[client] object StreamIngest {
       request: Int => F[Unit],
       prefetchN: Int
   ): F[StreamIngest[F, T]] =
-    (Concurrent[F].ref(prefetchN), Queue.unbounded[F, Either[GrpcStatus, T]])
-      .mapN((d, q) => create[F, T](request, prefetchN, d, q))
+    Queue
+      .unbounded[F, Either[GrpcStatus, T]]
+      .map(q => create[F, T](request, prefetchN, q))
 
   def create[F[_], T](
       request: Int => F[Unit],
       prefetchN: Int,
-      demand: Ref[F, Int],
       queue: Queue[F, Either[GrpcStatus, T]]
   )(implicit F: Concurrent[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
 
+    val limit: Int =
+      math.max(1, prefetchN)
+
+    val ensureMessages: F[Unit] =
+      queue.size.flatMap(qs => request(1).whenA(qs < limit))
+
     def onMessage(msg: T): F[Unit] =
-      decreaseDemandBy(1) *> queue.offer(msg.asRight)
+      queue.offer(msg.asRight) *> ensureMessages
 
     def onClose(status: GrpcStatus): F[Unit] =
       queue.offer(status.asLeft)
-
-    def ensureMessages(nextWhenEmpty: Int): F[Unit] =
-      (demand.get, queue.size).mapN((cd, qs) => fetch(nextWhenEmpty).whenA((cd + qs) < 1)).flatten
-
-    def decreaseDemandBy(n: Int): F[Unit] =
-      demand.update(d => math.max(d - n, 0))
-
-    def increaseDemandBy(n: Int): F[Unit] =
-      demand.update(_ + n)
-
-    def fetch(n: Int): F[Unit] =
-      request(n) *> increaseDemandBy(n)
 
     val messages: Stream[F, T] = {
 
       val run: F[Option[T]] =
         queue.take.flatMap {
-          case Right(v) => v.some.pure[F] <* ensureMessages(prefetchN)
+          case Right(v) => ensureMessages *> v.some.pure[F]
           case Left(GrpcStatus(status, trailers)) =>
             if (!status.isOk) F.raiseError(status.asRuntimeException(trailers))
             else none[T].pure[F]

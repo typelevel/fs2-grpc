@@ -4,7 +4,6 @@ package client
 
 import cats.syntax.all._
 import cats.effect._
-import cats.effect.concurrent.Ref
 import fs2.Stream
 import fs2.concurrent.InspectableQueue
 
@@ -20,40 +19,33 @@ private[client] object StreamIngest {
       request: Int => F[Unit],
       prefetchN: Int
   ): F[StreamIngest[F, T]] =
-    (Ref.of[F, Int](prefetchN), InspectableQueue.unbounded[F, Either[GrpcStatus, T]])
-      .mapN((d, q) => create[F, T](request, prefetchN, d, q)) <* request(prefetchN)
+    InspectableQueue
+      .unbounded[F, Either[GrpcStatus, T]]
+      .map(q => create[F, T](request, prefetchN, q))
 
   def create[F[_], T](
       request: Int => F[Unit],
       prefetchN: Int,
-      demand: Ref[F, Int],
       queue: InspectableQueue[F, Either[GrpcStatus, T]]
   )(implicit F: ConcurrentEffect[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
 
+    val limit: Int =
+      math.max(1, prefetchN)
+
+    val ensureMessages: F[Unit] =
+      queue.getSize.flatMap(qs => request(1).whenA(qs < limit))
+
     def onMessage(msg: T): F[Unit] =
-      decreaseDemandBy(1) *> queue.enqueue1(msg.asRight)
+      queue.enqueue1(msg.asRight) *> ensureMessages
 
     def onClose(status: GrpcStatus): F[Unit] =
       queue.enqueue1(status.asLeft)
-
-    def ensureMessages(nextWhenEmpty: Int): F[Unit] = (demand.get, queue.getSize)
-      .mapN((cd, qs) => fetch(nextWhenEmpty).whenA((cd + qs) < 1))
-      .flatten
-
-    def decreaseDemandBy(n: Int): F[Unit] =
-      demand.update(d => math.max(d - n, 0))
-
-    def increaseDemandBy(n: Int): F[Unit] =
-      demand.update(_ + n)
-
-    def fetch(n: Int): F[Unit] =
-      request(n) *> increaseDemandBy(n)
 
     val messages: Stream[F, T] = {
 
       val run: F[Option[T]] =
         queue.dequeue1.flatMap {
-          case Right(v) => v.some.pure[F] <* ensureMessages(prefetchN)
+          case Right(v) => ensureMessages *> v.some.pure[F]
           case Left(GrpcStatus(status, trailers)) =>
             if (!status.isOk) F.raiseError(status.asRuntimeException(trailers))
             else none[T].pure[F]

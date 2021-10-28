@@ -67,7 +67,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   def unaryToStreamingCall(message: Request, headers: Metadata)(implicit F: ConcurrentEffect[F]): Stream[F, Response] =
     Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](request, prefetchN), headers))(
+      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](request, prefetchN), headers) <* request(1))(
         handleExitCase(cancelComplete = true)
       )
       .flatMap(Stream.eval_(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
@@ -76,7 +76,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       F: ConcurrentEffect[F]
   ): Stream[F, Response] =
     Stream
-      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](request, prefetchN), headers))(
+      .bracketCase(startListener(Fs2StreamClientCallListener[F, Response](request, prefetchN), headers) <* request(1))(
         handleExitCase(cancelComplete = true)
       )
       .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))

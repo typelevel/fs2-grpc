@@ -15,7 +15,7 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
     val call: Fs2ServerCall[F, Request, Response]
 )(implicit F: Effect[F])
     extends ServerCall.Listener[Request]
-    with Fs2ServerCallListener[F, Stream[F, ?], Request, Response] {
+    with Fs2ServerCallListener[F, Stream[F, *], Request, Response] {
 
   override def onCancel(): Unit = {
     isCancelled.complete(()).unsafeRun()

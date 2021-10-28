@@ -187,7 +187,7 @@ object ClientSuite extends SimpleTestSuite {
     ec.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 2)
+    assertEquals(dummy.requested, 3)
   }
 
   test("single message to unaryToStreaming - back pressure") {
@@ -214,7 +214,7 @@ object ClientSuite extends SimpleTestSuite {
 
     assertEquals(result.value, Some(Success(List(1, 2))))
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 1)
+    assertEquals(dummy.requested, 2)
   }
 
   test("stream to streamingToStreaming") {

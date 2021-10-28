@@ -6,12 +6,12 @@ object Dependencies {
 
     val grpc = scalapb.compiler.Version.grpcJavaVersion
     val scalaPb = scalapb.compiler.Version.scalapbVersion
-    val fs2 = "2.5.5"
-    val catsEffect = "2.5.0"
-    val minitest = "2.9.5"
+    val fs2 = "2.5.10"
+    val catsEffect = "2.5.4"
+    val minitest = "2.9.6"
 
-    val kindProjector = "0.10.3"
-    val sbtProtoc = "1.0.3"
+    val kindProjector = "0.13.2"
+    val sbtProtoc = "1.0.4"
 
   }
 
@@ -31,6 +31,6 @@ object Dependencies {
 
   val sbtProtoc = "com.thesamet" % "sbt-protoc" % versions.sbtProtoc
   val scalaPbCompiler = "com.thesamet.scalapb" %% "compilerplugin" % versions.scalaPb
-  val kindProjector = "org.typelevel" %% "kind-projector" % versions.kindProjector cross CrossVersion.binary
+  val kindProjector = "org.typelevel" %% "kind-projector" % versions.kindProjector cross CrossVersion.full
 
 }

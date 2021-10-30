@@ -62,7 +62,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   private def sendStream(stream: Stream[F, Request]): Stream[F, Unit] =
     stream.evalMap(sendMessage) ++ Stream.eval(halfClose)
 
-  ///
+  // /
 
   def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
     Stream
@@ -88,7 +88,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       .resource(mkStreamListenerR(md))
       .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))
 
-  ///
+  // /
 
   private def handleExitCase(cancelSucceed: Boolean): (ClientCall.Listener[Response], Resource.ExitCase) => F[Unit] = {
     case (_, Resource.ExitCase.Succeeded) => cancel("call done".some, None).whenA(cancelSucceed)

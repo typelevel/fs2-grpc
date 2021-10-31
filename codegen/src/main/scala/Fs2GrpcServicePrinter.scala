@@ -130,7 +130,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
       .add("}")
   }
 
-  ///
+  // /
 
   def printService(printer: FunctionalPrinter): FunctionalPrinter = {
     printer
@@ -150,7 +150,7 @@ object Fs2GrpcServicePrinter {
     private val fs2grpcPkg = "_root_.fs2.grpc"
     private val grpcPkg = "_root_.io.grpc"
 
-    ///
+    // /
 
     val Ctx = "A"
 

@@ -359,7 +359,7 @@ class ClientSuite extends Fs2GrpcSuite {
       testAdapter(_.streamingToStreamingCall(Stream.emit("hello"), new Metadata()).compile.toList.void)
     }
 
-    ///
+    // /
 
     testCalls(shouldAdapt = true, d)
     testCalls(shouldAdapt = false, d)

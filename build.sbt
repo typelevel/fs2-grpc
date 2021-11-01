@@ -3,7 +3,7 @@ import com.typesafe.tools.mima.core.ProblemFilters._
 import Dependencies._
 
 lazy val Scala3 = "3.1.0"
-lazy val Scala213 = "2.13.5"
+lazy val Scala213 = "2.13.7"
 lazy val Scala212 = "2.12.15"
 
 Global / lintUnusedKeysOnLoad := false

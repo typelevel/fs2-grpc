@@ -67,6 +67,7 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
 
   def handleCodeGeneratorRequest(request: PluginProtos.CodeGeneratorRequest): PluginProtos.CodeGeneratorResponse = {
     val builder = CodeGeneratorResponse.newBuilder
+    builder.setSupportedFeatures(CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL.getNumber.toLong)
     val genRequest = CodeGenRequest(request)
     parseParameters(genRequest.parameter) match {
       case Right((params, fs2params)) =>

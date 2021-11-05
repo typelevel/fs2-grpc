@@ -99,12 +99,11 @@ lazy val runtime = project
     Test / parallelExecution := false
   )
 
-lazy val protocGen = protocGenProject("protoc-gen", codegen)
+lazy val protocGen = protocGenProject("protoc-gen-fs2-grpc", codegen)
   .settings(
     Compile / mainClass := Some(codegenFullName),
     scalaVersion := Scala212,
     githubWorkflowArtifactUpload := false,
-    publish / skip := true,
     mimaFailOnNoPrevious := false,
     mimaPreviousArtifacts := Set()
   )

@@ -106,6 +106,7 @@ lazy val protocGen = protocGenProject("protoc-gen-fs2-grpc", codegen)
     scalaVersion := Scala212
   )
   .aggregateProjectSettings(
+    crossScalaVersions := List(Scala212),
     githubWorkflowArtifactUpload := false,
     mimaFailOnNoPrevious := false,
     mimaPreviousArtifacts := Set()

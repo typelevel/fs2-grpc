@@ -24,16 +24,14 @@ package fs2.grpc.codegen
 import com.google.protobuf.Descriptors.FileDescriptor
 import com.google.protobuf.ExtensionRegistry
 import com.google.protobuf.compiler.PluginProtos
-import com.google.protobuf.compiler.PluginProtos.{CodeGeneratorRequest, CodeGeneratorResponse}
-import protocbridge.ProtocCodeGenerator
-import protocgen.CodeGenRequest
-import scalapb.compiler.{DescriptorImplicits, FunctionalPrinter, GeneratorException, GeneratorParams}
+import protocgen.{CodeGenApp, CodeGenRequest, CodeGenResponse}
+import scalapb.compiler.{DescriptorImplicits, FunctionalPrinter, GeneratorParams}
 import scalapb.options.Scalapb
 import scala.collection.JavaConverters._
 
 final case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
 
-object Fs2CodeGenerator extends ProtocCodeGenerator {
+object Fs2CodeGenerator extends CodeGenApp {
 
   def generateServiceFiles(
       file: FileDescriptor,
@@ -45,10 +43,9 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
 
       import di.{ExtendedServiceDescriptor, ExtendedFileDescriptor}
       val code = p.printService(FunctionalPrinter()).result()
-      val b = CodeGeneratorResponse.File.newBuilder()
+      val b = PluginProtos.CodeGeneratorResponse.File.newBuilder()
       b.setName(file.scalaDirectory + "/" + service.name + s"${fs2params.serviceSuffix}.scala")
       b.setContent(code)
-      println(b.getName)
       b.build
     }
   }
@@ -65,34 +62,27 @@ object Fs2CodeGenerator extends ProtocCodeGenerator {
       }
     } yield (params, suffix)
 
-  def handleCodeGeneratorRequest(request: PluginProtos.CodeGeneratorRequest): PluginProtos.CodeGeneratorResponse = {
-    val builder = CodeGeneratorResponse.newBuilder
-    builder.setSupportedFeatures(CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL.getNumber.toLong)
-    val genRequest = CodeGenRequest(request)
-    parseParameters(genRequest.parameter) match {
+  def process(request: CodeGenRequest): CodeGenResponse = {
+    parseParameters(request.parameter) match {
       case Right((params, fs2params)) =>
-        try {
-          val implicits = DescriptorImplicits.fromCodeGenRequest(params, genRequest)
-          val srvFiles = genRequest.filesToGenerate.flatMap(generateServiceFiles(_, fs2params, implicits))
-          builder.addAllFile(srvFiles.asJava)
-        } catch {
-          case e: GeneratorException =>
-            builder.setError(e.message)
-        }
-
+        val implicits = DescriptorImplicits.fromCodeGenRequest(params, request)
+        val srvFiles = request.filesToGenerate.flatMap(generateServiceFiles(_, fs2params, implicits))
+        CodeGenResponse.succeed(
+          srvFiles,
+          Set(PluginProtos.CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL)
+        )
       case Left(error) =>
-        builder.setError(error)
+        CodeGenResponse.fail(error)
     }
-
-    builder.build()
   }
 
-  override def run(req: Array[Byte]): Array[Byte] = {
-    println("Running")
-    val registry = ExtensionRegistry.newInstance()
+  override def registerExtensions(registry: ExtensionRegistry): Unit = {
     Scalapb.registerAllExtensions(registry)
-    val request = CodeGeneratorRequest.parseFrom(req, registry)
-    handleCodeGeneratorRequest(request).toByteArray()
+  }
+
+  @deprecated("Use process(CodeGenRequest(request)) instead. Method kept for binary compatibility.", "fs-grpc 2.2.6")
+  def handleCodeGeneratorRequest(request: PluginProtos.CodeGeneratorRequest): PluginProtos.CodeGeneratorResponse = {
+    process(CodeGenRequest(request)).toCodeGeneratorResponse
   }
 
   private[codegen] val ServiceSuffix: String = "serviceSuffix"

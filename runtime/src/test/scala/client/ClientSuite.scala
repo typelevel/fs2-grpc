@@ -70,7 +70,8 @@ class ClientSuite extends Fs2GrpcSuite {
     assertEquals(result.value, None)
 
     // Check that call is cancelled after 1 second
-    tc.tick(2.seconds)
+    tc.advance(1.second)
+    tc.tickAll()
 
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[TimeoutException])
@@ -268,7 +269,9 @@ class ClientSuite extends Fs2GrpcSuite {
     assertEquals(result.value, None)
 
     // Check that call completes after status
-    tc.tick(2.seconds)
+    tc.advance(2.seconds)
+    tc.tickAll()
+
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[TimeoutException])
     assertEquals(dummy.cancelled.isDefined, true)

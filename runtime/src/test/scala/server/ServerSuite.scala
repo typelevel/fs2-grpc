@@ -90,7 +90,7 @@ class ServerSuite extends Fs2GrpcSuite {
     }
 
     listener.onHalfClose()
-    tc.tick()
+    tc.tickAll()
 
     assertEquals(dummy.currentStatus.isDefined, true)
     assertEquals(dummy.currentStatus.get.isOk, true, "Current status true because stream completed successfully")

@@ -38,7 +38,10 @@ inThisBuild(
       dev("ahjohannessen", "Alex Henning Johannessen", "ahjohannessen@gmail.com")
     )
   ) ++ List(
-    githubWorkflowJavaVersions := Seq("adopt@1.8", "adopt@1.11"),
+    githubWorkflowJavaVersions := Seq(
+      JavaSpec.temurin("8"),
+      JavaSpec.temurin("17")
+    ),
     githubWorkflowBuild := Seq(
       WorkflowStep.Sbt(
         name = Some("Run tests"),

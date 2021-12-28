@@ -52,6 +52,11 @@ inThisBuild(
   ) ++ List(
     spiewakCiReleaseSnapshots := false,
     spiewakMainBranches := Seq("master", "series/0.x")
+  ) ++ List(
+     mimaBinaryIssueFilters ++= Seq(
+      // API that is not extended by end-users
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("fs2.grpc.GeneratedCompanion.mkClient")
+     )
   )
 )
 

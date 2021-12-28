@@ -66,11 +66,15 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
   }
 
   private[this] def serviceMethodImplementation(method: MethodDescriptor): PrinterEndo = { p =>
+    val mkMetadata = if (method.isServerStreaming) s"$Stream.eval(mkMetadata(ctx))" else "mkMetadata(ctx)"
+
     p.add(serviceMethodSignature(method) + " = {")
       .indent
-      .add(
-        s"${createClientCall(method)}.flatMap(_.${handleMethod(method)}(request, mkMetadata(ctx)))"
-      )
+      .add(s"$mkMetadata.flatMap { m =>")
+      .indent
+      .add(s"${createClientCall(method)}.flatMap(_.${handleMethod(method)}(request, m))")
+      .outdent
+      .add("}")
       .outdent
       .add("}")
   }
@@ -113,7 +117,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   private[this] def serviceClient: PrinterEndo = {
     _.add(
-      s"def client[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, mkMetadata: $Ctx => $Metadata, clientOptions: $ClientOptions): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
+      s"def mkClient[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, mkMetadata: $Ctx => F[$Metadata], clientOptions: $ClientOptions): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
     ).indent
       .call(serviceMethodImplementations)
       .outdent

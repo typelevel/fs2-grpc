@@ -35,56 +35,84 @@ trait GeneratedCompanion[Service[*[_], _]] {
 
 ///=== Client ==========================================================================================================
 
-  def client[F[_]: Async, A](
+  def mkClient[F[_]: Async, A](
+      dispatcher: Dispatcher[F],
+      channel: Channel,
+      mkMetadata: A => F[Metadata],
+      clientOptions: ClientOptions
+  ): Service[F, A]
+
+  final def mkClient[F[_]: Async, A](
+      dispatcher: Dispatcher[F],
+      channel: Channel,
+      mkMetadata: A => F[Metadata]
+  ): Service[F, A] =
+    mkClient[F, A](dispatcher, channel, mkMetadata, ClientOptions.default)
+
+  final def mkClientResource[F[_]: Async, A](
+      channel: Channel,
+      mkMetadata: A => F[Metadata],
+      clientOptions: ClientOptions
+  ): Resource[F, Service[F, A]] =
+    Dispatcher[F].map(mkClient[F, A](_, channel, mkMetadata, clientOptions))
+
+  final def mkClientResource[F[_]: Async, A](
+      channel: Channel,
+      mkMetadata: A => F[Metadata]
+  ): Resource[F, Service[F, A]] =
+    mkClientResource[F, A](channel, mkMetadata, ClientOptions.default)
+
+  final def client[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       channel: Channel,
       mkMetadata: A => Metadata,
       clientOptions: ClientOptions
-  ): Service[F, A]
+  ): Service[F, A] =
+    mkClient[F, A](dispatcher, channel, (a: A) => mkMetadata(a).pure[F], clientOptions)
 
   final def client[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       channel: Channel,
       mkMetadata: A => Metadata
   ): Service[F, A] =
-    client[F, A](dispatcher, channel, mkMetadata, ClientOptions.default)
+    mkClient[F, A](dispatcher, channel, (a: A) => mkMetadata(a).pure[F], ClientOptions.default)
 
   final def clientResource[F[_]: Async, A](
       channel: Channel,
       mkMetadata: A => Metadata,
       clientOptions: ClientOptions
   ): Resource[F, Service[F, A]] =
-    Dispatcher[F].map(client[F, A](_, channel, mkMetadata, clientOptions))
+    mkClientResource[F, A](channel, (a: A) => mkMetadata(a).pure[F], clientOptions)
 
   final def clientResource[F[_]: Async, A](
       channel: Channel,
       mkMetadata: A => Metadata
   ): Resource[F, Service[F, A]] =
-    clientResource[F, A](channel, mkMetadata, ClientOptions.default)
+    mkClientResource[F, A](channel, (a: A) => mkMetadata(a).pure[F], ClientOptions.default)
 
   final def stub[F[_]: Async](
       dispatcher: Dispatcher[F],
       channel: Channel,
       clientOptions: ClientOptions
   ): Service[F, Metadata] =
-    client[F, Metadata](dispatcher, channel, (m: Metadata) => m, clientOptions)
+    mkClient[F, Metadata](dispatcher, channel, (m: Metadata) => m.pure[F], clientOptions)
 
   final def stub[F[_]: Async](
       dispatcher: Dispatcher[F],
       channel: Channel
   ): Service[F, Metadata] =
-    stub[F](dispatcher, channel, ClientOptions.default)
+    mkClient[F, Metadata](dispatcher, channel, (m: Metadata) => m.pure[F], ClientOptions.default)
 
   final def stubResource[F[_]: Async](
       channel: Channel,
       clientOptions: ClientOptions
   ): Resource[F, Service[F, Metadata]] =
-    clientResource[F, Metadata](channel, (m: Metadata) => m, clientOptions)
+    mkClientResource[F, Metadata](channel, (m: Metadata) => m.pure[F], clientOptions)
 
   final def stubResource[F[_]: Async](
       channel: Channel
   ): Resource[F, Service[F, Metadata]] =
-    stubResource[F](channel, ClientOptions.default)
+    mkClientResource[F, Metadata](channel, (m: Metadata) => m.pure[F], ClientOptions.default)
 
 ///=== Service =========================================================================================================
 

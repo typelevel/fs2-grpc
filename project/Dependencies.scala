@@ -11,7 +11,7 @@ object Dependencies {
     val catsEffect = "3.3.3"
     val ceMunit = "1.0.7"
 
-    val sbtProtoc = "1.0.5"
+    val sbtProtoc = "1.0.6"
 
   }
 

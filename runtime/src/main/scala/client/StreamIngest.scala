@@ -52,11 +52,11 @@ private[client] object StreamIngest {
     val limit: Int =
       math.max(1, prefetchN)
 
-    val ensureMessages: F[Unit] =
-      queue.size.flatMap(qs => request(1).whenA(qs < limit))
+    def ensureMessages(whenQs: Int => Boolean): F[Unit] =
+      queue.size.flatMap(qs => request(1).whenA(whenQs(qs)))
 
     def onMessage(msg: T): F[Unit] =
-      queue.offer(msg.asRight) *> ensureMessages
+      ensureMessages(qs => qs < limit && qs > 0) *> queue.offer(msg.asRight)
 
     def onClose(status: GrpcStatus): F[Unit] =
       queue.offer(status.asLeft)
@@ -65,7 +65,7 @@ private[client] object StreamIngest {
 
       val run: F[Option[T]] =
         queue.take.flatMap {
-          case Right(v) => ensureMessages *> v.some.pure[F]
+          case Right(v) => ensureMessages(_ == 0) *> v.some.pure[F]
           case Left(GrpcStatus(status, trailers)) =>
             if (!status.isOk) F.raiseError(status.asRuntimeException(trailers))
             else none[T].pure[F]

@@ -23,31 +23,36 @@ package fs2
 package grpc
 package client
 
+import cats.syntax.all._
 import cats.effect._
+import cats.effect.std._
 import munit._
 
 class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
 
   test("basic") {
 
-    def run(prefetchN: Int, takeN: Int, expectedReq: Int, expectedCount: Int) = {
-      for {
-        ref <- IO.ref(0)
-        ingest <- StreamIngest[IO, Int](req => ref.update(_ + req), prefetchN)
-        _ <- Stream.emits((1 to prefetchN)).evalTap(ingest.onMessage).compile.drain
-        messages <- ingest.messages.take(takeN.toLong).compile.toList
-        requested <- ref.get
-      } yield {
-        assertEquals(messages.size, expectedCount)
-        assertEquals(requested, expectedReq)
-      }
-    }
+    def run(prefetchN: Int, takeN: Int, expectedReq: Int) = for {
 
-    run(prefetchN = 1, takeN = 1, expectedReq = 1, expectedCount = 1) *>
-      run(prefetchN = 2, takeN = 1, expectedReq = 2, expectedCount = 1) *>
-      run(prefetchN = 2, takeN = 2, expectedReq = 3, expectedCount = 2) *>
-      run(prefetchN = 1024, takeN = 1024, expectedReq = 2047, expectedCount = 1024) *>
-      run(prefetchN = 1024, takeN = 1023, expectedReq = 2046, expectedCount = 1023)
+      rc <- IO.ref(0)
+      grpc <- Queue.bounded[IO, Int](prefetchN)
+      fetch = rc.get.flatMap(r => (rc.update(_ + 1) *> grpc.offer(r + 1)).whenA(r <= takeN))
+      ingest <- StreamIngest[IO, Int](_ => fetch, prefetchN)
+      _ <- grpc.offer(0)
+      worker <- Stream.fromQueueUnterminated(grpc).evalTap(ingest.onMessage).compile.drain.start
+      _ <- ingest.messages.take(takeN.toLong).compile.drain
+      req <- rc.get
+      _ <- worker.cancel
+
+    } yield assertEquals(req, expectedReq)
+
+    run(prefetchN = 1, takeN = 1, expectedReq = 1) *>
+      run(prefetchN = 2, takeN = 1, expectedReq = 1) *>
+      run(prefetchN = 2, takeN = 2, expectedReq = 2) *>
+      run(prefetchN = 8, takeN = 16, expectedReq = 16) *>
+      run(prefetchN = 16, takeN = 31, expectedReq = 31) *>
+      run(prefetchN = 32, takeN = 32, expectedReq = 32) *>
+      run(prefetchN = 64, takeN = 64, expectedReq = 64)
 
   }
 

@@ -65,11 +65,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   // /
 
   def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
-    Stream
-      .resource(mkUnaryListenerR(headers))
-      .evalMap(sendSingleMessage(message) *> _.getValue.adaptError(ea))
-      .compile
-      .lastOrError
+    mkUnaryListenerR(headers)
+      .use(sendSingleMessage(message) *> _.getValue.adaptError(ea))
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
     Stream
@@ -97,8 +94,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   }
 
   private def mkUnaryListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] = {
-
-    val acquire = start(Fs2UnaryClientCallListener.create[F, Response](dispatcher), md) <* request(1)
+    val create = Fs2UnaryClientCallListener.create[F, Response](dispatcher)
+    val acquire = start(create, md) <* request(1)
     val release = handleExitCase(cancelSucceed = false)
 
     Resource.makeCase(acquire)(release)

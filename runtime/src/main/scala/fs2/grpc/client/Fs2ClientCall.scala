@@ -105,10 +105,9 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   }
 
   private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
-
-    val acquire =
-      start(Fs2StreamClientCallListener.create[F, Response](request, dispatcher, options.prefetchN), md) <* request(1)
-
+    val prefetchN = options.prefetchN.max(1)
+    val create = Fs2StreamClientCallListener.create[F, Response](request, dispatcher, prefetchN)
+    val acquire = start(create, md) <* request(prefetchN)
     val release = handleExitCase(cancelSucceed = true)
 
     Resource.makeCase(acquire)(release)

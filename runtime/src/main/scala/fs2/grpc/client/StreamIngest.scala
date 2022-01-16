@@ -25,7 +25,8 @@ package client
 
 import cats.implicits._
 import cats.effect.Concurrent
-import cats.effect.std.Queue
+import cats.effect.Deferred
+import fs2.concurrent.Channel
 
 private[client] trait StreamIngest[F[_], T] {
   def onMessage(msg: T): F[Unit]
@@ -39,40 +40,30 @@ private[client] object StreamIngest {
       request: Int => F[Unit],
       prefetchN: Int
   ): F[StreamIngest[F, T]] =
-    Queue
-      .unbounded[F, Either[GrpcStatus, T]]
-      .map(q => create[F, T](request, prefetchN, q))
+    Deferred[F, GrpcStatus].flatMap { gate =>
+      Channel.bounded[F, T](prefetchN).map(ch => create(request, ch, gate))
+    }
 
   def create[F[_], T](
       request: Int => F[Unit],
-      prefetchN: Int,
-      queue: Queue[F, Either[GrpcStatus, T]]
+      channel: Channel[F, T],
+      gate: Deferred[F, GrpcStatus]
   )(implicit F: Concurrent[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
 
-    val limit: Int =
-      math.max(1, prefetchN)
-
-    val ensureMessages: F[Unit] =
-      queue.size.flatMap(qs => request(1).whenA(qs < limit))
-
     def onMessage(msg: T): F[Unit] =
-      queue.offer(msg.asRight) *> ensureMessages
+      channel.send(msg).void
 
     def onClose(status: GrpcStatus): F[Unit] =
-      queue.offer(status.asLeft)
+      channel.close *> gate.complete(status).void
 
     val messages: Stream[F, T] = {
+      val close = gate.get.flatMap { case GrpcStatus(status, trailers) =>
+        F.raiseError(status.asRuntimeException(trailers)).whenA(!status.isOk)
+      }
 
-      val run: F[Option[T]] =
-        queue.take.flatMap {
-          case Right(v) => ensureMessages *> v.some.pure[F]
-          case Left(GrpcStatus(status, trailers)) =>
-            if (!status.isOk) F.raiseError(status.asRuntimeException(trailers))
-            else none[T].pure[F]
-        }
-
-      Stream.repeatEval(run).unNoneTerminate
-
+      channel.stream.chunks.flatMap { chunk =>
+        Stream.exec(request(chunk.size)) ++ Stream.chunk(chunk)
+      }.onFinalize(close)
     }
 
   }

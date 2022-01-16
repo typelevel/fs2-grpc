@@ -61,9 +61,11 @@ private[client] object StreamIngest {
         F.raiseError(status.asRuntimeException(trailers)).whenA(!status.isOk)
       }
 
-      channel.stream.chunks.flatMap { chunk =>
-        Stream.exec(request(chunk.size)) ++ Stream.chunk(chunk)
-      }.onFinalize(close)
+      channel.stream.chunks
+        .flatMap { chunk =>
+          Stream.exec(request(chunk.size)) ++ Stream.chunk(chunk)
+        }
+        .onFinalize(close)
     }
 
   }

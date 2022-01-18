@@ -8,8 +8,6 @@ lazy val Scala212 = "2.12.15"
 
 Global / lintUnusedKeysOnLoad := false
 
-enablePlugins(SonatypeCiReleasePlugin)
-
 def dev(ghUser: String, name: String, email: String): Developer =
   Developer(ghUser, name, email, url(s"https://github.com/$ghUser"))
 
@@ -17,21 +15,10 @@ inThisBuild(
   List(
     scalaVersion := Scala3,
     crossScalaVersions := List(Scala3, Scala213, Scala212),
-    baseVersion := "2.0",
-    versionIntroduced := Map(
-      // First version under org.typelevel
-      "2.12" -> "1.1.2",
-      "2.13" -> "1.1.2",
-      "3.0.0-RC2" -> "1.1.2"
-    ),
+    tlBaseVersion := "2.4",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
-    organization := "org.typelevel",
     organizationName := "Gary Coady / Fs2 Grpc Developers",
-    publishGithubUser := "rossabaker",
-    publishFullName := "Ross A. Baker",
-    homepage := Some(url("https://github.com/typelevel/fs2-grpc")),
-    scmInfo := Some(ScmInfo(url("https://github.com/typelevel/fs2-grpc"), "git@github.com:typelevel/fs2-grpc.git")),
     developers := List(
       dev("fiadliel", "Gary Coady", "gary@lyranthe.org"),
       dev("rossabaker", "Ross A. Baker", "ross@rossabaker.com"),
@@ -41,17 +28,7 @@ inThisBuild(
     githubWorkflowJavaVersions := Seq(
       JavaSpec.temurin("8"),
       JavaSpec.temurin("17")
-    ),
-    githubWorkflowBuild := Seq(
-      WorkflowStep.Sbt(
-        name = Some("Run tests"),
-        commands = List("scalafmtCheckAll", "test", "mimaReportBinaryIssues")
-      )
-    ),
-    githubWorkflowTargetBranches := List("*", "series/*")
-  ) ++ List(
-    spiewakCiReleaseSnapshots := false,
-    spiewakMainBranches := Seq("master", "series/0.x")
+    )
   ) ++ List(
     mimaBinaryIssueFilters ++= Seq(
       // API that is not extended by end-users

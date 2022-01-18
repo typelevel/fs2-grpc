@@ -14,7 +14,7 @@ def dev(ghUser: String, name: String, email: String): Developer =
 inThisBuild(
   List(
     scalaVersion := Scala3,
-    crossScalaVersions := List(Scala3, Scala213, Scala212),
+    crossScalaVersions := List(Scala212, Scala213, Scala3),
     tlBaseVersion := "2.4",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),

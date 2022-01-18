@@ -39,6 +39,8 @@ inThisBuild(
   )
 )
 
+//
+
 lazy val root = project
   .in(file("."))
   .enablePlugins(BuildInfoPlugin, NoPublishPlugin)

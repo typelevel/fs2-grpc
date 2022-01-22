@@ -23,7 +23,6 @@ package fs2
 package grpc
 package server
 
-import cats.syntax.all._
 import cats.effect._
 import cats.effect.std.Dispatcher
 import io.grpc._
@@ -35,6 +34,7 @@ class Fs2ServerCallHandler[F[_]: Async] private (
 
   def unaryToUnaryCall[Request, Response](
       implementation: (Request, Metadata) => F[Response]
+<<<<<<< HEAD
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
       val listener = dispatcher.unsafeRunSync(Fs2UnaryServerCallListener[F](call, dispatcher, options))
@@ -42,6 +42,10 @@ class Fs2ServerCallHandler[F[_]: Async] private (
       listener
     }
   }
+=======
+  ): ServerCallHandler[Request, Response] =
+    Fs2UnaryToUnaryHandler(implementation, dispatcher, options)
+>>>>>>> 79eacbe (runtime: redo server unary to unary)
 
   def unaryToStreamingCall[Request, Response](
       implementation: (Request, Metadata) => Stream[F, Response]

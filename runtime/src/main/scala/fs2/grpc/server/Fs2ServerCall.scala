@@ -27,6 +27,7 @@ import cats.effect._
 import io.grpc._
 
 private[server] class Fs2ServerCall[F[_], Request, Response](val call: ServerCall[Request, Response]) extends AnyVal {
+
   def sendHeaders(headers: Metadata)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.sendHeaders(headers))
 
@@ -38,6 +39,20 @@ private[server] class Fs2ServerCall[F[_], Request, Response](val call: ServerCal
 
   def request(numMessages: Int)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.request(numMessages))
+
+  private def reportError(t: Throwable)(implicit F: Sync[F]): F[Unit] = t match {
+    case ex: StatusException => closeStream(ex.getStatus, Option(ex.getTrailers).getOrElse(new Metadata()))
+    case ex: StatusRuntimeException => closeStream(ex.getStatus, Option(ex.getTrailers).getOrElse(new Metadata()))
+    case ex => closeStream(Status.INTERNAL.withDescription(ex.getMessage).withCause(ex), new Metadata())
+  }
+
+  def handleOutcome[A](fa: F[A])(implicit F: Sync[F]): F[A] =
+    F.guaranteeCase(fa) {
+      case Outcome.Succeeded(_) => closeStream(Status.OK, new Metadata())
+      case Outcome.Canceled() => closeStream(Status.CANCELLED, new Metadata())
+      case Outcome.Errored(t) => reportError(t)
+    }
+
 }
 
 private[server] object Fs2ServerCall {

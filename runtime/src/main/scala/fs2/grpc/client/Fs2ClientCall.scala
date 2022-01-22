@@ -62,14 +62,11 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   private def sendStream(stream: Stream[F, Request]): Stream[F, Unit] =
     stream.evalMap(sendMessage) ++ Stream.eval(halfClose)
 
-  // /
+  //
 
   def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
-    Stream
-      .resource(mkUnaryListenerR(headers))
-      .evalMap(sendSingleMessage(message) *> _.getValue.adaptError(ea))
-      .compile
-      .lastOrError
+    mkUnaryListenerR(headers)
+      .use(sendSingleMessage(message) *> _.getValue.adaptError(ea))
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
     Stream
@@ -88,7 +85,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       .resource(mkStreamListenerR(md))
       .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))
 
-  // /
+  //
 
   private def handleExitCase(cancelSucceed: Boolean): (ClientCall.Listener[Response], Resource.ExitCase) => F[Unit] = {
     case (_, Resource.ExitCase.Succeeded) => cancel("call done".some, None).whenA(cancelSucceed)
@@ -98,7 +95,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   private def mkUnaryListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] = {
 
-    val acquire = start(Fs2UnaryClientCallListener.create[F, Response](dispatcher), md) <* request(1)
+    val create = Fs2UnaryClientCallListener.create[F, Response](dispatcher)
+    val acquire = start(create, md) <* request(1)
     val release = handleExitCase(cancelSucceed = false)
 
     Resource.makeCase(acquire)(release)
@@ -106,9 +104,9 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
 
   private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
 
-    val acquire =
-      start(Fs2StreamClientCallListener.create[F, Response](request, dispatcher, options.prefetchN), md) <* request(1)
-
+    val prefetchN = options.prefetchN.max(1)
+    val create = Fs2StreamClientCallListener.create[F, Response](request, dispatcher, prefetchN)
+    val acquire = start(create, md) <* request(prefetchN)
     val release = handleExitCase(cancelSucceed = true)
 
     Resource.makeCase(acquire)(release)

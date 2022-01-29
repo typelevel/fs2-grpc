@@ -57,10 +57,11 @@ private[server] class Fs2ServerCall[F[_], Request, Response](val call: ServerCal
 
 private[server] object Fs2ServerCall {
 
-  def apply[F[_]: Sync, Request, Response](
+  def make[F[_], Request, Response](
       call: ServerCall[Request, Response],
       options: ServerOptions
-  ): F[Fs2ServerCall[F, Request, Response]] = Sync[F].delay {
+  ): SyncIO[Fs2ServerCall[F, Request, Response]] = SyncIO.delay {
+
     val callOptions = options.callOptionsFn(ServerCallOptions.default)
 
     call.setMessageCompression(callOptions.messageCompression)
@@ -68,5 +69,11 @@ private[server] object Fs2ServerCall {
 
     new Fs2ServerCall[F, Request, Response](call)
   }
+
+  def apply[F[_]: Sync, Request, Response](
+      call: ServerCall[Request, Response],
+      options: ServerOptions
+  ): F[Fs2ServerCall[F, Request, Response]] =
+    make[F, Request, Response](call, options).to[F]
 
 }

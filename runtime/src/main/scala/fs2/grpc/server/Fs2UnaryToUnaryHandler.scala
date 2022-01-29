@@ -27,17 +27,28 @@ import cats.syntax.all._
 import cats.effect._
 import cats.effect.std.Dispatcher
 import io.grpc._
-import io.grpc.ServerCall.Listener
 
 private[server] object Fs2UnaryToUnaryHandler {
+
+  private def tooManyRequests =
+    Status.INTERNAL.withDescription("Too many requests").asRuntimeException
 
   def mkListener[F[_], I, O](
       call: Fs2ServerCall[F, I, O],
       headers: Metadata,
       impl: (I, Metadata) => F[O],
       isCancelled: Deferred[F, Unit],
+      canInvoke: Ref[F, Boolean],
       dispatcher: Dispatcher[F]
   )(implicit F: Async[F]): ServerCall.Listener[I] = new ServerCall.Listener[I] {
+
+    val checkHandled: F[Unit] =
+      canInvoke.get >>= { cond =>
+        F.raiseError(tooManyRequests).unlessA(cond)
+      }
+
+    val setHandled: F[Unit] =
+      canInvoke.set(false)
 
     override def onCancel(): Unit = {
       val action = isCancelled.complete(()).void
@@ -46,7 +57,7 @@ private[server] object Fs2UnaryToUnaryHandler {
 
     override def onMessage(message: I): Unit = {
       val run = call.sendHeaders(headers) *> impl(message, headers) >>= call.sendMessage
-      val action = F.race(call.handleOutcome(run), isCancelled.get)
+      val action = F.race(call.handleOutcome(checkHandled *> run *> setHandled), isCancelled.get)
       dispatcher.unsafeRunAndForget(action)
     }
 
@@ -60,14 +71,16 @@ private[server] object Fs2UnaryToUnaryHandler {
 
     def startCall(call: ServerCall[I, O], headers: Metadata): ServerCall.Listener[I] = {
 
-      val action: F[Listener[I]] = Deferred[F, Unit] >>= { isCancelled =>
-        Fs2ServerCall(call, options) >>= { fs2Call =>
-          val listener = mkListener(fs2Call, headers, impl, isCancelled, dispatcher)
-          fs2Call.request(1).as(listener)
-        }
-      }
+      val action: SyncIO[ServerCall.Listener[I]] = for {
+        fs2Call <- Fs2ServerCall.make[F, I, O](call, options)
+        isCancelled <- Deferred.in[SyncIO, F, Unit]
+        canInvoke <- Ref.in[SyncIO, F, Boolean](true)
+        listener = mkListener(fs2Call, headers, impl, isCancelled, canInvoke, dispatcher)
+        _ <- SyncIO(fs2Call.call.request(1))
+      } yield listener
 
-      dispatcher.unsafeRunSync(action)
+      action.unsafeRunSync()
+
     }
 
   }

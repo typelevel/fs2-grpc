@@ -38,7 +38,7 @@ class Fs2ServerCallHandler[F[_]: Async] private (
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
       val listener = dispatcher.unsafeRunSync(Fs2UnaryServerCallListener[F](call, dispatcher, options))
-      listener.unsafeUnaryResponse(headers, _ flatMap { request => implementation(request, headers) })
+      listener.unsafeUnaryResponse(new Metadata(), _ flatMap { request => implementation(request, headers) })
       listener
     }
   }
@@ -61,7 +61,7 @@ class Fs2ServerCallHandler[F[_]: Async] private (
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
       val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
-      listener.unsafeUnaryResponse(headers, implementation(_, headers))
+      listener.unsafeUnaryResponse(new Metadata(), implementation(_, headers))
       listener
     }
   }
@@ -71,7 +71,7 @@ class Fs2ServerCallHandler[F[_]: Async] private (
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
       val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
-      listener.unsafeStreamResponse(headers, implementation(_, headers))
+      listener.unsafeStreamResponse(new Metadata(), implementation(_, headers))
       listener
     }
   }

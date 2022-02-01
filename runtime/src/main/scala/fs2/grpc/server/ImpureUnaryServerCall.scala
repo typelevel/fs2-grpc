@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 naoh / Fs2 Grpc Developers
+ * Copyright (c) 2018 Gary Coady / Fs2 Grpc Developers
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,7 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package fs2.grpc.server
+package fs2
+package grpc
+package server
 
 import cats.effect.Async
 import cats.effect.Sync

@@ -23,7 +23,6 @@ package fs2
 package grpc
 package server
 
-import cats.syntax.all._
 import cats.effect._
 import cats.effect.std.Dispatcher
 import io.grpc._

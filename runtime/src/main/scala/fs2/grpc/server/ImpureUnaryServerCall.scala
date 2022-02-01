@@ -34,7 +34,6 @@ import io.grpc.ServerCallHandler
 import io.grpc.Status
 import io.grpc.StatusException
 import io.grpc.StatusRuntimeException
-import scala.concurrent.Future
 
 object ImpureUnaryServerCall {
   type Cancel = () => Any
@@ -131,7 +130,7 @@ final class ImpureResponder[F[_], Request, Response](
       call.sendMessage(message)
     }
 
-  private def handleOutcome[F[_]](completed: F[Unit])(implicit F: Sync[F]): F[Unit] = {
+  private def handleOutcome(completed: F[Unit])(implicit F: Sync[F]): F[Unit] = {
     F.guaranteeCase(completed) {
       case Outcome.Succeeded(_) => closeStream(Status.OK, new Metadata())
       case Outcome.Errored(e) =>
@@ -147,7 +146,7 @@ final class ImpureResponder[F[_], Request, Response](
     }
   }
 
-  private def closeStream[F[_]](status: Status, metadata: Metadata)(implicit F: Sync[F]): F[Unit] =
+  private def closeStream(status: Status, metadata: Metadata)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.close(status, metadata))
 }
 

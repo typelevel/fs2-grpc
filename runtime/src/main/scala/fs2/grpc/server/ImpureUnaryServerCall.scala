@@ -36,7 +36,6 @@ import io.grpc.StatusException
 import io.grpc.StatusRuntimeException
 import scala.concurrent.Future
 
-
 object ImpureUnaryServerCall {
   type Cancel = () => Any
   private val Noop: Cancel = () => ()
@@ -46,8 +45,8 @@ object ImpureUnaryServerCall {
     Status.INTERNAL.withDescription("Too many requests").asRuntimeException
 
   def mkListener[Request, Response](
-    run: Request => Cancel,
-    call: ServerCall[Request, Response],
+      run: Request => Cancel,
+      call: ServerCall[Request, Response]
   ): ServerCall.Listener[Request] =
     new ServerCall.Listener[Request] {
 
@@ -79,10 +78,10 @@ object ImpureUnaryServerCall {
       }
     }
 
-  def unary[F[_] : Async, Request, Response](
-    impl: (Request, Metadata) => F[Response],
-    options: ServerOptions,
-    dispatcher: Dispatcher[F],
+  def unary[F[_]: Async, Request, Response](
+      impl: (Request, Metadata) => F[Response],
+      options: ServerOptions,
+      dispatcher: Dispatcher[F]
   ): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
@@ -90,15 +89,14 @@ object ImpureUnaryServerCall {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
         val responder = ImpureResponder.setup(opt, call, dispatcher)
         call.request(2)
-        mkListener[Request, Response](
-          req => responder.unary(impl(req, headers)), call)
+        mkListener[Request, Response](req => responder.unary(impl(req, headers)), call)
       }
     }
 
-  def stream[F[_] : Async, Request, Response](
-    impl: (Request, Metadata) => fs2.Stream[F, Response],
-    options: ServerOptions,
-    dispatcher: Dispatcher[F],
+  def stream[F[_]: Async, Request, Response](
+      impl: (Request, Metadata) => fs2.Stream[F, Response],
+      options: ServerOptions,
+      dispatcher: Dispatcher[F]
   ): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
@@ -106,15 +104,14 @@ object ImpureUnaryServerCall {
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
         val responder = ImpureResponder.setup(opt, call, dispatcher)
         call.request(2)
-        mkListener[Request, Response](
-          req => responder.stream(impl(req, headers)), call)
+        mkListener[Request, Response](req => responder.stream(impl(req, headers)), call)
       }
     }
 }
 
 final class ImpureResponder[F[_], Request, Response](
-  val call: ServerCall[Request, Response],
-  dispatcher: Dispatcher[F]
+    val call: ServerCall[Request, Response],
+    dispatcher: Dispatcher[F]
 ) {
 
   def stream(response: fs2.Stream[F, Response])(implicit F: Sync[F]): Cancel =
@@ -156,9 +153,9 @@ final class ImpureResponder[F[_], Request, Response](
 
 object ImpureResponder {
   def setup[F[_], I, O](
-    options: ServerCallOptions,
-    call: ServerCall[I, O],
-    dispatcher: Dispatcher[F]
+      options: ServerCallOptions,
+      call: ServerCall[I, O],
+      dispatcher: Dispatcher[F]
   ): ImpureResponder[F, I, O] = {
     call.setMessageCompression(options.messageCompression)
     options.compressor.map(_.name).foreach(call.setCompression)

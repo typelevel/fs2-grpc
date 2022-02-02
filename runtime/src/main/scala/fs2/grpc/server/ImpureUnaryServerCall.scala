@@ -27,13 +27,7 @@ import cats.effect.Async
 import cats.effect.Sync
 import cats.effect.kernel.Outcome
 import cats.effect.std.Dispatcher
-import fs2.grpc.server.ImpureUnaryServerCall.Cancel
-import io.grpc.Metadata
-import io.grpc.ServerCall
-import io.grpc.ServerCallHandler
-import io.grpc.Status
-import io.grpc.StatusException
-import io.grpc.StatusRuntimeException
+import io.grpc._
 
 object ImpureUnaryServerCall {
   type Cancel = () => Any
@@ -112,6 +106,7 @@ final class ImpureResponder[F[_], Request, Response](
     val call: ServerCall[Request, Response],
     dispatcher: Dispatcher[F]
 ) {
+  import ImpureUnaryServerCall.Cancel
 
   def stream(response: fs2.Stream[F, Response])(implicit F: Sync[F]): Cancel =
     dispatcher.unsafeRunCancelable(handleOutcome(response.map(sendMessage).compile.drain))

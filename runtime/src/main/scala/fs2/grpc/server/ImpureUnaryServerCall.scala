@@ -43,8 +43,8 @@ object ImpureUnaryServerCall {
   ): ServerCall.Listener[Request] =
     new ServerCall.Listener[Request] {
 
-      private var request: Request = _
-      private var cancel: Cancel = Noop
+      private[this] var request: Request = _
+      private[this] var cancel: Cancel = Noop
 
       override def onCancel(): Unit =
         cancel()

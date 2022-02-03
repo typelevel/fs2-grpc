@@ -34,9 +34,6 @@ object ImpureUnaryServerCall {
   private val Noop: Cancel = () => ()
   private val Closed: Cancel = () => ()
 
-  private def tooManyRequests =
-    Status.INTERNAL.withDescription("Too many requests").asRuntimeException
-
   def mkListener[Request, Response](
       run: Request => Cancel,
       call: ServerCall[Request, Response]
@@ -46,8 +43,10 @@ object ImpureUnaryServerCall {
       private[this] var request: Request = _
       private[this] var cancel: Cancel = Noop
 
-      override def onCancel(): Unit =
+      override def onCancel(): Unit = {
         cancel()
+        ()
+      }
 
       override def onMessage(message: Request): Unit =
         if (request == null) {

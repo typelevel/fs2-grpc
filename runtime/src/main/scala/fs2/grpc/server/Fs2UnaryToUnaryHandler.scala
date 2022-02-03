@@ -42,13 +42,11 @@ private[server] object Fs2UnaryToUnaryHandler {
       dispatcher: Dispatcher[F]
   )(implicit F: Async[F]): ServerCall.Listener[I] = new ServerCall.Listener[I] {
 
-    val checkHandled: F[Unit] =
-      canInvoke.get >>= { cond =>
-        F.raiseError(tooManyRequests).unlessA(cond)
+    def runGated(run: F[Unit]): F[Unit] =
+      canInvoke.access >>= { case (cond, modify) =>
+        if (cond) run >> modify(false).void
+        else F.raiseError(tooManyRequests)
       }
-
-    val setHandled: F[Unit] =
-      canInvoke.set(false)
 
     override def onCancel(): Unit = {
       val action = isCancelled.complete(()).void
@@ -57,8 +55,8 @@ private[server] object Fs2UnaryToUnaryHandler {
 
     override def onMessage(message: I): Unit = {
       val run = call.sendHeaders(headers) *> impl(message, headers) >>= call.sendMessage
-      val action = F.race(call.handleOutcome(checkHandled *> run *> setHandled), isCancelled.get)
-      dispatcher.unsafeRunAndForget(action)
+      val action = call.handleOutcome(runGated(run))
+      dispatcher.unsafeRunAndForget(F.race(action, isCancelled.get))
     }
 
   }

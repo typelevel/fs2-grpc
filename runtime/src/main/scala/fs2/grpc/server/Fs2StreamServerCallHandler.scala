@@ -24,7 +24,6 @@ package fs2.grpc.server
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import cats.effect.Async
-import cats.effect.Sync
 import cats.effect.std.Dispatcher
 import fs2.grpc.server.UnsafeChannel.State.Buffered
 import io.grpc.Metadata

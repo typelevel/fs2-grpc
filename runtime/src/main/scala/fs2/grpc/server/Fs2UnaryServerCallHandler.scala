@@ -108,10 +108,10 @@ final class Fs2StatefulServerCall[F[_], Request, Response](
   import Fs2StatefulServerCall.Cancel
 
   def stream(response: fs2.Stream[F, Response])(implicit F: Sync[F]): Cancel =
-    dispatcher.unsafeRunCancelable(handleOutcome(response.map(sendMessage).compile.drain))
+    run(response.map(sendMessage).compile.drain)
 
   def unary(response: F[Response])(implicit F: Sync[F]): Cancel =
-    dispatcher.unsafeRunCancelable(handleOutcome(F.map(response)(sendMessage)))
+    run(F.map(response)(sendMessage))
 
   private var sentHeader: Boolean = false
 
@@ -124,8 +124,8 @@ final class Fs2StatefulServerCall[F[_], Request, Response](
       call.sendMessage(message)
     }
 
-  private def handleOutcome(completed: F[Unit])(implicit F: Sync[F]): F[Unit] = {
-    F.guaranteeCase(completed) {
+  private def run(completed: F[Unit])(implicit F: Sync[F]): Cancel =
+    dispatcher.unsafeRunCancelable(F.guaranteeCase(completed) {
       case Outcome.Succeeded(_) => closeStream(Status.OK, new Metadata())
       case Outcome.Errored(e) =>
         e match {
@@ -137,8 +137,7 @@ final class Fs2StatefulServerCall[F[_], Request, Response](
             closeStream(Status.INTERNAL.withDescription(ex.getMessage).withCause(ex), new Metadata())
         }
       case Outcome.Canceled() => closeStream(Status.CANCELLED, new Metadata())
-    }
-  }
+    })
 
   private def closeStream(status: Status, metadata: Metadata)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.close(status, metadata))

@@ -44,23 +44,13 @@ class Fs2ServerCallHandler[F[_]: Async] private (
 
   def streamingToUnaryCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => F[Response]
-  ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
-    def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
-      listener.unsafeUnaryResponse(new Metadata(), implementation(_, headers))
-      listener
-    }
-  }
+  ): ServerCallHandler[Request, Response] =
+    Fs2StreamServerCallHandler.unary(implementation, options, dispatcher)
 
   def streamingToStreamingCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => Stream[F, Response]
-  ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
-    def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
-      listener.unsafeStreamResponse(new Metadata(), implementation(_, headers))
-      listener
-    }
-  }
+  ): ServerCallHandler[Request, Response] =
+    Fs2StreamServerCallHandler.stream(implementation, options, dispatcher)
 }
 
 object Fs2ServerCallHandler {

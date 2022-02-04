@@ -25,21 +25,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import cats.effect.Async
 import cats.effect.std.Dispatcher
-import fs2.grpc.server.UnsafeChannel.State.Buffered
 import io.grpc.Metadata
 import io.grpc.ServerCall
 import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 import fs2._
-import fs2.grpc.server.UnsafeChannel.State.Consumed
 import io.grpc.ServerCallHandler
 
 object Fs2StreamServerCallHandler {
-
   import Fs2StatefulServerCall.Cancel
-
-  private val Noop: Cancel = () => ()
-  private val Closed: Cancel = () => ()
 
   private def mkListener[F[_]: Async, Request, Response](
       run: Stream[F, Request] => Cancel,
@@ -117,7 +111,6 @@ final class UnsafeChannel[A] extends AtomicReference[State[A]](new State.Open(Qu
     }
   }
 
-  @nowarn
   @tailrec
   def close(): Unit =
     get() match {
@@ -125,7 +118,7 @@ final class UnsafeChannel[A] extends AtomicReference[State[A]](new State.Open(Qu
         if (!compareAndSet(open, open.done())) {
           close()
         }
-      case s: Suspended[A] =>
+      case s: Suspended[_] =>
         s.send(new Completed(Queue.empty))
       case _ => // unexpected
     }

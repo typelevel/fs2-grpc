@@ -29,12 +29,12 @@ import cats.effect.kernel.Outcome
 import cats.effect.std.Dispatcher
 import io.grpc._
 
-object ImpureUnaryServerCall {
-  type Cancel = () => Any
+object Fs2UnaryServerCallHandler {
+  import Fs2StatefulServerCall.Cancel
   private val Noop: Cancel = () => ()
   private val Closed: Cancel = () => ()
 
-  def mkListener[Request, Response](
+  private def mkListener[Request, Response](
       run: Request => Cancel,
       call: ServerCall[Request, Response]
   ): ServerCall.Listener[Request] =
@@ -79,7 +79,7 @@ object ImpureUnaryServerCall {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
 
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-        val responder = ImpureResponder.setup(opt, call, dispatcher)
+        val responder = Fs2StatefulServerCall.setup(opt, call, dispatcher)
         call.request(2)
         mkListener[Request, Response](req => responder.unary(impl(req, headers)), call)
       }
@@ -94,18 +94,18 @@ object ImpureUnaryServerCall {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
 
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-        val responder = ImpureResponder.setup(opt, call, dispatcher)
+        val responder = Fs2StatefulServerCall.setup(opt, call, dispatcher)
         call.request(2)
         mkListener[Request, Response](req => responder.stream(impl(req, headers)), call)
       }
     }
 }
 
-final class ImpureResponder[F[_], Request, Response](
-    val call: ServerCall[Request, Response],
+final class Fs2StatefulServerCall[F[_], Request, Response](
+    call: ServerCall[Request, Response],
     dispatcher: Dispatcher[F]
 ) {
-  import ImpureUnaryServerCall.Cancel
+  import Fs2StatefulServerCall.Cancel
 
   def stream(response: fs2.Stream[F, Response])(implicit F: Sync[F]): Cancel =
     dispatcher.unsafeRunCancelable(handleOutcome(response.map(sendMessage).compile.drain))
@@ -144,14 +144,16 @@ final class ImpureResponder[F[_], Request, Response](
     F.delay(call.close(status, metadata))
 }
 
-object ImpureResponder {
+object Fs2StatefulServerCall {
+  type Cancel = () => Any
+
   def setup[F[_], I, O](
       options: ServerCallOptions,
       call: ServerCall[I, O],
       dispatcher: Dispatcher[F]
-  ): ImpureResponder[F, I, O] = {
+  ): Fs2StatefulServerCall[F, I, O] = {
     call.setMessageCompression(options.messageCompression)
     options.compressor.map(_.name).foreach(call.setCompression)
-    new ImpureResponder[F, I, O](call, dispatcher)
+    new Fs2StatefulServerCall[F, I, O](call, dispatcher)
   }
 }

@@ -35,12 +35,12 @@ class Fs2ServerCallHandler[F[_]: Async] private (
   def unaryToUnaryCall[Request, Response](
       implementation: (Request, Metadata) => F[Response]
   ): ServerCallHandler[Request, Response] =
-    ImpureUnaryServerCall.unary(implementation, options, dispatcher)
+    Fs2UnaryServerCallHandler.unary(implementation, options, dispatcher)
 
   def unaryToStreamingCall[Request, Response](
       implementation: (Request, Metadata) => Stream[F, Response]
   ): ServerCallHandler[Request, Response] =
-    ImpureUnaryServerCall.stream(implementation, options, dispatcher)
+    Fs2UnaryServerCallHandler.stream(implementation, options, dispatcher)
 
   def streamingToUnaryCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => F[Response]

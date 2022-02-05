@@ -24,8 +24,6 @@ package grpc
 package server
 
 import cats.effect.Async
-import cats.effect.Sync
-import cats.effect.kernel.Outcome
 import cats.effect.std.Dispatcher
 import io.grpc._
 
@@ -99,60 +97,4 @@ object Fs2UnaryServerCallHandler {
         mkListener[Request, Response](req => responder.stream(impl(req, headers)), call)
       }
     }
-}
-
-final class Fs2StatefulServerCall[F[_], Request, Response](
-    call: ServerCall[Request, Response],
-    dispatcher: Dispatcher[F]
-) {
-  import Fs2StatefulServerCall.Cancel
-
-  def stream(response: fs2.Stream[F, Response])(implicit F: Sync[F]): Cancel =
-    run(response.map(sendMessage).compile.drain)
-
-  def unary(response: F[Response])(implicit F: Sync[F]): Cancel =
-    run(F.map(response)(sendMessage))
-
-  private var sentHeader: Boolean = false
-
-  private def sendMessage(message: Response): Unit =
-    if (!sentHeader) {
-      sentHeader = true
-      call.sendHeaders(new Metadata())
-      call.sendMessage(message)
-    } else {
-      call.sendMessage(message)
-    }
-
-  private def run(completed: F[Unit])(implicit F: Sync[F]): Cancel =
-    dispatcher.unsafeRunCancelable(F.guaranteeCase(completed) {
-      case Outcome.Succeeded(_) => closeStream(Status.OK, new Metadata())
-      case Outcome.Errored(e) =>
-        e match {
-          case ex: StatusException =>
-            closeStream(ex.getStatus, Option(ex.getTrailers).getOrElse(new Metadata()))
-          case ex: StatusRuntimeException =>
-            closeStream(ex.getStatus, Option(ex.getTrailers).getOrElse(new Metadata()))
-          case ex =>
-            closeStream(Status.INTERNAL.withDescription(ex.getMessage).withCause(ex), new Metadata())
-        }
-      case Outcome.Canceled() => closeStream(Status.CANCELLED, new Metadata())
-    })
-
-  private def closeStream(status: Status, metadata: Metadata)(implicit F: Sync[F]): F[Unit] =
-    F.delay(call.close(status, metadata))
-}
-
-object Fs2StatefulServerCall {
-  type Cancel = () => Any
-
-  def setup[F[_], I, O](
-      options: ServerCallOptions,
-      call: ServerCall[I, O],
-      dispatcher: Dispatcher[F]
-  ): Fs2StatefulServerCall[F, I, O] = {
-    call.setMessageCompression(options.messageCompression)
-    options.compressor.map(_.name).foreach(call.setCompression)
-    new Fs2StatefulServerCall[F, I, O](call, dispatcher)
-  }
 }

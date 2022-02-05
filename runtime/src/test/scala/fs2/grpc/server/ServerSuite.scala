@@ -62,7 +62,6 @@ class ServerSuite extends Fs2GrpcSuite {
 
     listener.onCancel()
     tc.tick()
-    IO.sleep(50.millis).unsafeRunSync()
 
     assertEquals(dummy.currentStatus, None)
     assertEquals(dummy.messages.length, 0)

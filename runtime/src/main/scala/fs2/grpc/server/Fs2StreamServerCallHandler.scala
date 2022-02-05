@@ -33,6 +33,7 @@ import fs2._
 import io.grpc.ServerCallHandler
 
 object Fs2StreamServerCallHandler {
+
   import Fs2StatefulServerCall.Cancel
 
   private def mkListener[F[_]: Async, Request, Response](
@@ -92,39 +93,47 @@ object Fs2StreamServerCallHandler {
 
 import UnsafeChannel._
 
-final class UnsafeChannel[A] extends AtomicReference[State[A]](new State.Open(Queue.empty)) {
+final class UnsafeChannel[A] extends AtomicReference[State[A]](State.Consumed) {
 
   import UnsafeChannel.State._
   import scala.annotation.nowarn
 
+  /** Send message to stream. This method is thread-unsafe
+    */
   @nowarn
   @tailrec
   def send(a: A): Unit = {
     get() match {
-      case cur: Buffered[A] =>
-        if (!compareAndSet(cur, cur.append(a))) {
+      case open: Open[A] =>
+        if (!compareAndSet(open, open.append(a))) {
           send(a)
         }
       case s: Suspended[A] =>
         lazySet(Consumed)
-        s.send(new Open(Queue(a)))
+        s.resume(new Open(Queue(a)))
+      case closed: Closed[A] =>
     }
   }
 
+  /** Close stream. This method is thread-unsafe
+    */
   @tailrec
   def close(): Unit =
     get() match {
       case open: Open[_] =>
-        if (!compareAndSet(open, open.done())) {
+        if (!compareAndSet(open, open.close())) {
           close()
         }
       case s: Suspended[_] =>
-        s.send(new Completed(Queue.empty))
-      case _ => // unexpected
+        lazySet(Done)
+        s.resume(Done)
+      case _ =>
     }
 
   import fs2._
 
+  /** This method can be called at most once
+    */
   def stream[F[_]](implicit F: Async[F]): Stream[F, A] = {
     @nowarn
     def go(): Pull[F, A, Unit] =
@@ -136,7 +145,7 @@ final class UnsafeChannel[A] extends AtomicReference[State[A]](new State.Open(Qu
               F.delay {
                 val next = new Suspended[A](s => cb(Right(s)))
                 if (!compareAndSet(Consumed, next)) {
-                  cb(Right(Consumed))
+                  cb(Right(getAndSet(Consumed)))
                   None
                 } else {
                   Some(F.delay(cb(Right(Cancelled))))
@@ -147,8 +156,8 @@ final class UnsafeChannel[A] extends AtomicReference[State[A]](new State.Open(Qu
         }
         .flatMap {
           case open: Open[A] => Pull.output(Chunk.queue(open.queue)) >> go()
-          case buffered: Completed[A] => Pull.output(Chunk.queue(buffered.queue))
-          case suspended: Suspended[A] => Pull.done
+          case completed: Closed[A] => Pull.output(Chunk.queue(completed.queue))
+          case suspended: Suspended[A] => Pull.done // unexpected
         }
 
     go().stream
@@ -161,28 +170,20 @@ object UnsafeChannel {
   sealed trait State[+A]
 
   object State {
-    private[UnsafeChannel] val Consumed: Open[Nothing] = new Open(Queue.empty)
-    private[UnsafeChannel] val Cancelled: Completed[Nothing] = new Completed(Queue.empty)
+    private[UnsafeChannel] val Consumed: State[Nothing] = new Open(Queue.empty)
+    private[UnsafeChannel] val Cancelled: State[Nothing] = new Closed(Queue.empty)
+    private[UnsafeChannel] val Done: State[Nothing] = new Closed(Queue.empty)
 
-    trait Buffered[A] {
-      self: State[A] =>
-      def append(a: A): State[A]
+    class Open[A](val queue: Queue[A]) extends State[A] {
+      def append(a: A): Open[A] = new Open(queue.enqueue(a))
 
-      def queue: Queue[A]
+      def close(): Closed[A] = new Closed(queue)
     }
 
-    class Open[A](val queue: Queue[A]) extends State[A] with Buffered[A] {
-      override def append(a: A): State[A] = new Open(queue.enqueue(a))
-
-      def done(): Completed[A] = new Completed(queue)
-    }
-
-    class Completed[A](val queue: Queue[A]) extends State[A] with Buffered[A] {
-      override def append(a: A): State[A] = new Completed(queue.enqueue(a))
-    }
+    class Closed[A](val queue: Queue[A]) extends State[A]
 
     class Suspended[A](val f: State[A] => Unit) extends AtomicBoolean(false) with State[A] {
-      def send(state: State[A]): Unit =
+      def resume(state: State[A]): Unit =
         if (!getAndSet(true)) {
           f(state)
         }

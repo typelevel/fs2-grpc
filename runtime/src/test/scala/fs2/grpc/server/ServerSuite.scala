@@ -57,8 +57,7 @@ class ServerSuite extends Fs2GrpcSuite {
 
   runTest("cancellation for unaryToUnary") { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int](
-      (req, _) => IO(req.length), ServerOptions.default, d)
+    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int]((req, _) => IO(req.length), ServerOptions.default, d)
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onCancel()
@@ -72,7 +71,10 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("cancellation on the fly for unaryToUnary") { (tc, d) =>
     val dummy = new DummyServerCall
     val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int](
-      (req, _) => IO(req.length).delayBy(10.seconds), ServerOptions.default, d)
+      (req, _) => IO(req.length).delayBy(10.seconds),
+      ServerOptions.default,
+      d
+    )
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onMessage("123")
@@ -85,7 +87,6 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.messages.length, 0)
   }
 
-
   runTest("multiple messages to unaryToUnary")(multipleUnaryToUnary())
   runTest("multiple messages to unaryToUnary with compression")(multipleUnaryToUnary(compressionOps))
 
@@ -93,8 +94,7 @@ class ServerSuite extends Fs2GrpcSuite {
       options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int](
-      (req, _) => IO(req.length), ServerOptions.default, d)
+    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int]((req, _) => IO(req.length), ServerOptions.default, d)
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onMessage("123")
@@ -109,11 +109,10 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("no messages to unaryToUnary with compression")(noMessageUnaryToUnary(compressionOps))
 
   private def noMessageUnaryToUnary(
-    options: ServerOptions = ServerOptions.default
+      options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int](
-      (req, _) => IO(req.length), ServerOptions.default, d)
+    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int]((req, _) => IO(req.length), ServerOptions.default, d)
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onHalfClose()
@@ -121,7 +120,6 @@ class ServerSuite extends Fs2GrpcSuite {
 
     assertEquals(dummy.currentStatus.map(_.getCode), Some(Status.Code.INTERNAL))
   }
-
 
   runTest0("resource awaits termination of server") { (tc, r, _) =>
     import fs2.grpc.syntax.all._
@@ -141,8 +139,8 @@ class ServerSuite extends Fs2GrpcSuite {
       options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.stream[IO, String, Int](
-      (s, _) => Stream(s).map(_.length).repeat.take(5), options, d)
+    val handler =
+      Fs2UnaryServerCallHandler.stream[IO, String, Int]((s, _) => Stream(s).map(_.length).repeat.take(5), options, d)
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onMessage("123")
@@ -159,7 +157,10 @@ class ServerSuite extends Fs2GrpcSuite {
     val dummy = new DummyServerCall
 
     val handler = Fs2StreamServerCallHandler.stream[IO, String, Int](
-      (_, _) => Stream.emit(3).repeat.take(5), ServerOptions.default, d)
+      (_, _) => Stream.emit(3).repeat.take(5),
+      ServerOptions.default,
+      d
+    )
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onHalfClose()
@@ -174,7 +175,10 @@ class ServerSuite extends Fs2GrpcSuite {
   runTest("cancellation for streamingToStreaming") { (tc, d) =>
     val dummy = new DummyServerCall
     val handler = Fs2StreamServerCallHandler.stream[IO, String, Int](
-      (_, _) => Stream.emit(3).repeat.take(5).zipLeft(Stream.awakeDelay[IO](1.seconds)), ServerOptions.default, d)
+      (_, _) => Stream.emit(3).repeat.take(5).zipLeft(Stream.awakeDelay[IO](1.seconds)),
+      ServerOptions.default,
+      d
+    )
     val listener = handler.startCall(dummy, new Metadata())
 
     tc.tick()
@@ -191,8 +195,8 @@ class ServerSuite extends Fs2GrpcSuite {
       options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler = Fs2StreamServerCallHandler.stream[IO, String, Int](
-      (req, _) => req.map(_.length).intersperse(0), options, d)
+    val handler =
+      Fs2StreamServerCallHandler.stream[IO, String, Int]((req, _) => req.map(_.length).intersperse(0), options, d)
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onMessage("a")
@@ -211,7 +215,10 @@ class ServerSuite extends Fs2GrpcSuite {
     val error = new RuntimeException("hello")
 
     val handler = Fs2StreamServerCallHandler.stream[IO, String, Int](
-      (req, _) => req.map(_.length) ++ Stream.emit(0) ++ Stream.raiseError[IO](error), ServerOptions.default, d)
+      (req, _) => req.map(_.length) ++ Stream.emit(0) ++ Stream.raiseError[IO](error),
+      ServerOptions.default,
+      d
+    )
     val listener = handler.startCall(dummy, new Metadata())
 
     listener.onMessage("a")
@@ -237,10 +244,9 @@ class ServerSuite extends Fs2GrpcSuite {
 
     val dummy = new DummyServerCall
 
-    val handler = Fs2StreamServerCallHandler.unary[IO, String, Int](
-      (req, _) => implementation(req), so, d)
+    val handler = Fs2StreamServerCallHandler.unary[IO, String, Int]((req, _) => implementation(req), so, d)
     val listener = handler.startCall(dummy, new Metadata())
-    
+
     listener.onMessage("ab")
     listener.onMessage("abc")
     listener.onHalfClose()

@@ -37,7 +37,8 @@ inThisBuild(
       ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.client.StreamIngest.create"),
       // deleted private classes
       ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.client.Fs2UnaryClientCallListener*"),
-      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*")
+      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*"),
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.server.internal.*")
     )
   )
 )

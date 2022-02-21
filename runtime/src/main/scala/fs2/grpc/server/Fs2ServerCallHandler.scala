@@ -25,6 +25,7 @@ package server
 
 import cats.effect._
 import cats.effect.std.Dispatcher
+import fs2.grpc.server.internal.Fs2StreamServerCallHandler
 import fs2.grpc.server.internal.Fs2UnaryServerCallHandler
 import io.grpc._
 
@@ -36,32 +37,22 @@ class Fs2ServerCallHandler[F[_]: Async] private (
   def unaryToUnaryCall[Request, Response](
       implementation: (Request, Metadata) => F[Response]
   ): ServerCallHandler[Request, Response] =
-    Fs2UnaryServerCallHandler.unary(implementation, options, dispatcher)
+    Fs2UnaryServerCallHandler.mkHandler(implementation, options)(_.unary(_, dispatcher))
 
   def unaryToStreamingCall[Request, Response](
       implementation: (Request, Metadata) => Stream[F, Response]
   ): ServerCallHandler[Request, Response] =
-    Fs2UnaryServerCallHandler.stream(implementation, options, dispatcher)
+    Fs2UnaryServerCallHandler.mkHandler(implementation, options)(_.stream(_, dispatcher))
 
   def streamingToUnaryCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => F[Response]
-  ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
-    def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
-      listener.unsafeUnaryResponse(new Metadata(), implementation(_, headers))
-      listener
-    }
-  }
+  ): ServerCallHandler[Request, Response] =
+    Fs2StreamServerCallHandler.mkHandler(implementation, options)(_.unary(_, dispatcher))
 
   def streamingToStreamingCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => Stream[F, Response]
-  ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
-    def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, dispatcher, options))
-      listener.unsafeStreamResponse(new Metadata(), implementation(_, headers))
-      listener
-    }
-  }
+  ): ServerCallHandler[Request, Response] =
+    Fs2StreamServerCallHandler.mkHandler(implementation, options)(_.stream(_, dispatcher))
 }
 
 object Fs2ServerCallHandler {

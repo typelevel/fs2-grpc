@@ -73,6 +73,12 @@ private[server] final class Fs2ServerCall[Request, Response](
       dispatcher
     )
 
+  def requestOnPull[F[_]]: Pipe[F, Request, Request] =
+    _.mapChunks { chunk =>
+      call.request(chunk.size)
+      chunk
+    }
+
   def request(n: Int): SyncIO[Unit] =
     SyncIO(call.request(n))
 

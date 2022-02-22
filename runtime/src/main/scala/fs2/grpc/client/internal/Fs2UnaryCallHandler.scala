@@ -25,6 +25,7 @@ import cats.effect.Sync
 import cats.effect.SyncIO
 import cats.effect.syntax.all._
 import cats.effect.kernel.Async
+import cats.effect.kernel.Outcome
 import cats.effect.kernel.Ref
 import cats.syntax.functor._
 import cats.syntax.flatMap._
@@ -130,7 +131,7 @@ object Fs2UnaryCallHandler {
   def stream[F[_], Request, Response](
       call: ClientCall[Request, Response],
       options: ClientOptions,
-      message: Stream[F, Request],
+      messages: Stream[F, Request],
       headers: Metadata
   )(implicit F: Async[F]): F[Response] = F.async[Response] { cb =>
     ReceiveState.init(cb, options.errorAdapter).flatMap { state =>
@@ -138,13 +139,17 @@ object Fs2UnaryCallHandler {
       // Initially ask for two responses from flow-control so that if a misbehaving server
       // sends more than one responses, we can catch it and fail it in the listener.
       call.request(2)
-      message
+      messages
         .map(call.sendMessage)
-        .onFinalize(F.delay(call.halfClose()))
         .compile
         .drain
+        .guaranteeCase {
+          case Outcome.Succeeded(_) => F.delay(call.halfClose())
+          case Outcome.Errored(e) => F.delay(call.cancel(e.getMessage, e))
+          case Outcome.Canceled() => onCancel(call)
+        }
         .start
-        .map(fiber => Some(fiber.cancel >> onCancel(call)))
+        .map(sending => Some(sending.cancel >> onCancel(call)))
     }
   }
 

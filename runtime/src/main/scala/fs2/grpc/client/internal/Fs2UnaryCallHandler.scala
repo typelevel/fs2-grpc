@@ -33,7 +33,7 @@ import fs2._
 import fs2.grpc.client.ClientOptions
 import io.grpc._
 
-object Fs2UnaryCallHandler {
+private[client] object Fs2UnaryCallHandler {
   sealed trait ReceiveState[R]
 
   object ReceiveState {
@@ -59,7 +59,7 @@ object Fs2UnaryCallHandler {
     def sendError(error: Throwable): SyncIO[ReceiveState[R]] =
       SyncIO(callback(Left(error))).as(new Done[R])
 
-    def done(): SyncIO[ReceiveState[R]] = SyncIO(callback(Right(message))).as(new Done[R])
+    def done: SyncIO[ReceiveState[R]] = SyncIO(callback(Right(message))).as(new Done[R])
   }
 
   class Done[R] extends ReceiveState[R]
@@ -88,7 +88,8 @@ object Fs2UnaryCallHandler {
       override def onClose(status: Status, trailers: Metadata): Unit = {
         if (status.isOk) {
           state.get.flatMap {
-            case expected: PendingHalfClose[Response] => expected.done().flatMap(state.set)
+            case expected: PendingHalfClose[Response] =>
+              expected.done.flatMap(state.set)
             case current: PendingMessage[Response] =>
               current
                 .sendError(

@@ -31,6 +31,7 @@ class DummyClientCall extends ClientCall[String, Int] {
   val messagesSent: ArrayBuffer[String] = ArrayBuffer[String]()
   var listener: Option[ClientCall.Listener[Int]] = None
   var cancelled: Option[(String, Throwable)] = None
+  var halfClosed = false
 
   override def start(responseListener: ClientCall.Listener[Int], headers: Metadata): Unit =
     listener = Some(responseListener)
@@ -40,7 +41,8 @@ class DummyClientCall extends ClientCall[String, Int] {
   override def cancel(message: String, cause: Throwable): Unit =
     cancelled = Some((message, cause))
 
-  override def halfClose(): Unit = ()
+  override def halfClose(): Unit =
+    halfClosed = true
 
   override def sendMessage(message: String): Unit = {
     messagesSent += message

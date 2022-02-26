@@ -26,6 +26,7 @@ package client
 import cats.syntax.all._
 import cats.effect.{Async, Resource}
 import cats.effect.std.Dispatcher
+import fs2.grpc.client.internal.Fs2UnaryCallHandler
 import io.grpc.{Metadata, _}
 
 final case class UnaryResult[A](value: Option[A], status: Option[GrpcStatus])
@@ -65,15 +66,10 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   //
 
   def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
-    mkUnaryListenerR(headers)
-      .use(sendSingleMessage(message) *> _.getValue.adaptError(ea))
+    Fs2UnaryCallHandler.unary(call, options, message, headers)
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
-    Stream
-      .resource(mkUnaryListenerR(headers))
-      .flatMap(l => Stream.eval(l.getValue.adaptError(ea)).concurrently(sendStream(messages)))
-      .compile
-      .lastOrError
+    Fs2UnaryCallHandler.stream(call, options, messages, headers)
 
   def unaryToStreamingCall(message: Request, md: Metadata): Stream[F, Response] =
     Stream
@@ -91,15 +87,6 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     case (_, Resource.ExitCase.Succeeded) => cancel("call done".some, None).whenA(cancelSucceed)
     case (_, Resource.ExitCase.Canceled) => cancel("call was cancelled".some, None)
     case (_, Resource.ExitCase.Errored(t)) => cancel(t.getMessage.some, t.some)
-  }
-
-  private def mkUnaryListenerR(md: Metadata): Resource[F, Fs2UnaryClientCallListener[F, Response]] = {
-
-    val create = Fs2UnaryClientCallListener.create[F, Response](dispatcher)
-    val acquire = start(create, md) <* request(1)
-    val release = handleExitCase(cancelSucceed = false)
-
-    Resource.makeCase(acquire)(release)
   }
 
   private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] = {

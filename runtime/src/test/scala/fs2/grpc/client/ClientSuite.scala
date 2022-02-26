@@ -53,7 +53,7 @@ class ClientSuite extends Fs2GrpcSuite {
     tc.tick()
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 1)
+    assertEquals(dummy.requested, 2)
 
   }
 
@@ -93,7 +93,7 @@ class ClientSuite extends Fs2GrpcSuite {
     assert(result.value.get.isFailure)
     assert(result.value.get.failed.get.isInstanceOf[StatusRuntimeException])
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 1)
+    assertEquals(dummy.requested, 2)
 
   }
 
@@ -118,7 +118,7 @@ class ClientSuite extends Fs2GrpcSuite {
       Status.INTERNAL
     )
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 1)
+    assertEquals(dummy.requested, 2)
 
   }
 
@@ -142,7 +142,7 @@ class ClientSuite extends Fs2GrpcSuite {
     tc.tick()
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 3)
-    assertEquals(dummy.requested, 1)
+    assertEquals(dummy.requested, 2)
 
   }
 
@@ -166,7 +166,7 @@ class ClientSuite extends Fs2GrpcSuite {
     tc.tick()
     assertEquals(result.value, Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 0)
-    assertEquals(dummy.requested, 1)
+    assertEquals(dummy.requested, 2)
 
   }
 

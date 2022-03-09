@@ -16,7 +16,6 @@ inThisBuild(
     scalaVersion := Scala3,
     crossScalaVersions := List(Scala212, Scala213, Scala3),
     tlBaseVersion := "2.4",
-    tlSonatypeUseLegacyHost := false,
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organizationName := "Gary Coady / Fs2 Grpc Developers",

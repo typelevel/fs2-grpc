@@ -5,12 +5,12 @@ package server
 import cats.effect.concurrent.Deferred
 import cats.effect.{ConcurrentEffect, Effect}
 import cats.implicits._
-import io.grpc.ServerCall
-import fs2.concurrent.Queue
 import fs2._
+import io.grpc.ServerCall
+import org.lyranthe.fs2_grpc.java_runtime.client.StreamIngest
 
 class Fs2StreamServerCallListener[F[_], Request, Response] private (
-    requestQ: Queue[F, Option[Request]],
+    ingest: StreamIngest[F, Option[Request]],
     signalReadiness: F[Unit],
     val isCancelled: Deferred[F, Unit],
     val call: Fs2ServerCall[F, Request, Response]
@@ -25,14 +25,13 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
   }
 
   override def onMessage(message: Request): Unit = {
-    call.call.request(1)
-    requestQ.enqueue1(message.some).unsafeRun()
+    ingest.onMessage(Some(message)).unsafeRun()
   }
 
-  override def onHalfClose(): Unit = requestQ.enqueue1(none).unsafeRun()
+  override def onHalfClose(): Unit = ingest.onMessage(none).unsafeRun()
 
   override def source: Stream[F, Request] =
-    requestQ.dequeue.unNoneTerminate
+    ingest.messages.unNoneTerminate
 }
 
 object Fs2StreamServerCallListener {
@@ -44,12 +43,13 @@ object Fs2StreamServerCallListener {
         options: ServerCallOptions = ServerCallOptions.default
     )(implicit
         F: ConcurrentEffect[F]
-    ): F[Fs2StreamServerCallListener[F, Request, Response]] =
+    ): F[Fs2StreamServerCallListener[F, Request, Response]] = {
       for {
-        inputQ <- Queue.unbounded[F, Option[Request]]
         isCancelled <- Deferred[F, Unit]
         serverCall <- Fs2ServerCall[F, Request, Response](call, options)
-      } yield new Fs2StreamServerCallListener[F, Request, Response](inputQ, signalReadiness, isCancelled, serverCall)
+        ingest <- StreamIngest[F, Option[Request]](serverCall.request, options.prefetchN)
+      } yield new Fs2StreamServerCallListener[F, Request, Response](ingest, signalReadiness, isCancelled, serverCall)
+    }
   }
 
   def apply[F[_]] = new PartialFs2StreamServerCallListener[F]

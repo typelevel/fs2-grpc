@@ -1,19 +1,19 @@
 package org.lyranthe.fs2_grpc
 package java_runtime
-package client
+package client // TODO shared?
 
 import cats.syntax.all._
 import cats.effect._
 import fs2.Stream
 import fs2.concurrent.InspectableQueue
 
-private[client] trait StreamIngest[F[_], T] {
+private[java_runtime] trait StreamIngest[F[_], T] {
   def onMessage(msg: T): F[Unit]
   def onClose(status: GrpcStatus): F[Unit]
   def messages: Stream[F, T]
 }
 
-private[client] object StreamIngest {
+private[java_runtime] object StreamIngest {
 
   def apply[F[_]: ConcurrentEffect, T](
       request: Int => F[Unit],

@@ -2,8 +2,9 @@ package org.lyranthe.fs2_grpc
 package java_runtime
 package server
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.concurrent.Deferred
 import cats.effect.laws.util.TestContext
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import fs2._
 import io.grpc._
@@ -293,6 +294,49 @@ object ServerSuite extends SimpleTestSuite {
     assertEquals(dummy.messages(0), 5)
     assertEquals(dummy.currentStatus.isDefined, true)
     assertEquals(dummy.currentStatus.get.isOk, true)
+  }
+
+  test("streamingToUnary back pressure") {
+    implicit val ec: TestContext = TestContext()
+    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+
+    val deferred = Deferred[IO, Unit].unsafeRunSync()
+    val implementation: Stream[IO, String] => IO[Int] = {
+      requests => requests.evalMap(_ => deferred.get).compile.drain.as(1) }
+
+    val dummy = new DummyServerCall
+    val listener = Fs2StreamServerCallListener[IO].apply[String, Int](dummy, IO.unit).unsafeRunSync()
+
+    listener.unsafeUnaryResponse(new Metadata(), implementation)
+    ec.tick()
+
+    assertEquals(dummy.requested, 1)
+
+    listener.onMessage("1")
+    ec.tick()
+
+    listener.onMessage("2")
+    listener.onMessage("3")
+    ec.tick()
+
+    // requested should ideally be 2, however StreamIngest can double-request in some execution
+    // orderings if the push() is followed by pop() before the push checks the queue length.
+    val initialRequested = dummy.requested
+    assert(initialRequested == 2 || initialRequested == 3, s"expected requested to be 2 or 3, got ${initialRequested}")
+
+    // don't request any more messages while downstream is blocked
+    listener.onMessage("4")
+    listener.onMessage("5")
+    listener.onMessage("6")
+    ec.tick()
+
+    assertEquals(dummy.requested - initialRequested, 0)
+
+    // allow all messages through, the final pop() will trigger a new request
+    deferred.complete(()).unsafeToFuture()
+    ec.tick()
+
+    assertEquals(dummy.requested - initialRequested, 1)
   }
 
 }

@@ -6,6 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 import io.grpc._
 
 class DummyClientCall extends ClientCall[String, Int] {
+  var ready = true
   var requested: Int = 0
   val messagesSent: ArrayBuffer[String] = ArrayBuffer[String]()
   var listener: Option[ClientCall.Listener[Int]] = None
@@ -24,5 +25,14 @@ class DummyClientCall extends ClientCall[String, Int] {
   override def sendMessage(message: String): Unit = {
     messagesSent += message
     ()
+  }
+
+  override def isReady: Boolean = ready
+
+  def setIsReady(value: Boolean): Unit = {
+    ready = value
+    if (value) {
+      listener.foreach(_.onReady())
+    }
   }
 }

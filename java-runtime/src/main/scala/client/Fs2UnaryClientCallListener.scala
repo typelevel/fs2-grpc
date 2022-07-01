@@ -9,10 +9,13 @@ import io.grpc._
 
 private[client] class Fs2UnaryClientCallListener[F[_], Response](
     grpcStatus: Deferred[F, GrpcStatus],
-    value: Ref[F, Option[Response]]
+    value: Ref[F, Option[Response]],
+    signalReadiness: F[Unit]
 )(implicit
     F: Effect[F]
 ) extends ClientCall.Listener[Response] {
+
+  override def onReady(): Unit = signalReadiness.unsafeRun()
 
   override def onClose(status: Status, trailers: Metadata): Unit =
     grpcStatus.complete(GrpcStatus(status, trailers)).unsafeRun()
@@ -46,9 +49,9 @@ private[client] class Fs2UnaryClientCallListener[F[_], Response](
 
 private[client] object Fs2UnaryClientCallListener {
 
-  def apply[F[_]: ConcurrentEffect, Response]: F[Fs2UnaryClientCallListener[F, Response]] = {
+  def apply[F[_]: ConcurrentEffect, Response](signalReadiness: F[Unit]): F[Fs2UnaryClientCallListener[F, Response]] = {
     (Deferred[F, GrpcStatus], Ref.of[F, Option[Response]](none)).mapN((response, value) =>
-      new Fs2UnaryClientCallListener[F, Response](response, value)
+      new Fs2UnaryClientCallListener[F, Response](response, value, signalReadiness)
     )
   }
 

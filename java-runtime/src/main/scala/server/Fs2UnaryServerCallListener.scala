@@ -9,6 +9,7 @@ import io.grpc._
 
 class Fs2UnaryServerCallListener[F[_], Request, Response] private (
     request: Ref[F, Option[Request]],
+    signalReadiness: F[Unit],
     isComplete: Deferred[F, Unit],
     val isCancelled: Deferred[F, Unit],
     val call: Fs2ServerCall[F, Request, Response]
@@ -17,6 +18,8 @@ class Fs2UnaryServerCallListener[F[_], Request, Response] private (
     with Fs2ServerCallListener[F, F, Request, Response] {
 
   import Fs2UnaryServerCallListener._
+
+  override def onReady(): Unit = signalReadiness.unsafeRun()
 
   override def onCancel(): Unit = {
     isCancelled.complete(()).unsafeRun()
@@ -57,6 +60,7 @@ object Fs2UnaryServerCallListener {
 
     def apply[Request, Response](
         call: ServerCall[Request, Response],
+        signalReadiness: F[Unit],
         options: ServerCallOptions = ServerCallOptions.default
     )(implicit
         F: ConcurrentEffect[F]
@@ -66,7 +70,7 @@ object Fs2UnaryServerCallListener {
         isComplete <- Deferred[F, Unit]
         isCancelled <- Deferred[F, Unit]
         serverCall <- Fs2ServerCall[F, Request, Response](call, options)
-      } yield new Fs2UnaryServerCallListener[F, Request, Response](request, isComplete, isCancelled, serverCall)
+      } yield new Fs2UnaryServerCallListener[F, Request, Response](request, signalReadiness, isComplete, isCancelled, serverCall)
   }
 
   def apply[F[_]] = new PartialFs2UnaryServerCallListener[F]

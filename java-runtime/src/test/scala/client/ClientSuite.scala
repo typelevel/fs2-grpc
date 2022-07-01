@@ -138,6 +138,39 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(dummy.requested, 1)
   }
 
+  test("stream to streamingToUnary - send respects readiness") {
+    implicit val ec: TestContext = TestContext()
+    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+
+    val dummy = new DummyClientCall()
+    val client = fs2ClientCall(dummy)
+    val requests = Stream.emits(List("a", "b", "c", "d", "e"))
+      .unchunk
+      .map { value =>
+        if (value == "c") dummy.setIsReady(false)
+        value
+      }
+
+    val result = client
+      .streamingToUnaryCall(requests, new Metadata())
+      .unsafeToFuture()
+
+    ec.tick()
+
+    assertEquals(dummy.messagesSent.size, 2)
+    assertEquals(result.value, None)
+
+    dummy.setIsReady(true)
+    ec.tick()
+
+    dummy.listener.get.onMessage(1)
+    dummy.listener.get.onClose(Status.OK, new Metadata())
+    ec.tick()
+
+    assertEquals(result.value, Some(Success(1)))
+    assertEquals(dummy.messagesSent.size, 5)
+  }
+
   test("0-length to streamingToUnary") {
 
     implicit val ec: TestContext = TestContext()
@@ -245,6 +278,41 @@ object ClientSuite extends SimpleTestSuite {
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 5)
     assertEquals(dummy.requested, 2)
+  }
+
+  test("stream to streamingToStreaming respects readiness") {
+    implicit val ec: TestContext = TestContext()
+    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+
+    val dummy = new DummyClientCall()
+    val client = fs2ClientCall(dummy)
+    val requests = Stream.emits(List("a", "b", "c", "d", "e"))
+      .unchunk
+      .map { value =>
+        if (value == "c") dummy.setIsReady(false)
+        value
+      }
+
+    val result = client
+      .streamingToStreamingCall(requests, new Metadata())
+      .compile
+      .toList
+      .unsafeToFuture()
+
+    ec.tick()
+
+    assertEquals(dummy.messagesSent.size, 2)
+    assertEquals(result.value, None)
+
+    dummy.setIsReady(true)
+    ec.tick()
+
+    assertEquals(dummy.messagesSent.size, 5)
+
+    dummy.listener.get.onClose(Status.OK, new Metadata())
+    ec.tick()
+
+    assertEquals(result.value, Some(Success(Nil)))
   }
 
   test("cancellation for streamingToStreaming") {

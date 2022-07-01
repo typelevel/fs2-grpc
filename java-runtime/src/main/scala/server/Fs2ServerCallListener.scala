@@ -7,6 +7,7 @@ import cats.effect.concurrent.Deferred
 import cats.implicits._
 import fs2.Stream
 import io.grpc.{Metadata, Status, StatusException, StatusRuntimeException}
+import org.lyranthe.fs2_grpc.java_runtime.shared.Readiness
 
 private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   def source: G[Request]
@@ -26,10 +27,10 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   }
 
   private def handleUnaryResponse(headers: Metadata, response: F[Response])(implicit F: Sync[F]): F[Unit] =
-    call.sendHeaders(headers) *> call.request(1) *> response >>= call.sendMessage
+    call.sendHeaders(headers) *> call.request(1) *> response >>= call.sendMessageImmediately
 
-  private def handleStreamResponse(headers: Metadata, response: Stream[F, Response])(implicit F: Sync[F]): F[Unit] =
-    call.sendHeaders(headers) *> call.request(1) *> response.evalMap(call.sendMessage).compile.drain
+  private def handleStreamResponse(readiness: Readiness[F], headers: Metadata, response: Stream[F, Response])(implicit F: Sync[F]): F[Unit] =
+    call.sendHeaders(headers) *> call.request(1) *> response.evalMap(call.sendMessageWhenReady(readiness)).compile.drain
 
   private def unsafeRun(f: F[Unit])(implicit F: ConcurrentEffect[F]): Unit = {
     val bracketed = F.guaranteeCase(f) {
@@ -47,8 +48,8 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   ): Unit =
     unsafeRun(handleUnaryResponse(headers, implementation(source)))
 
-  def unsafeStreamResponse(headers: Metadata, implementation: G[Request] => Stream[F, Response])(implicit
+  def unsafeStreamResponse(readiness: Readiness[F], headers: Metadata, implementation: G[Request] => Stream[F, Response])(implicit
       F: ConcurrentEffect[F]
   ): Unit =
-    unsafeRun(handleStreamResponse(headers, implementation(source)))
+    unsafeRun(handleStreamResponse(readiness, headers, implementation(source)))
 }

@@ -23,12 +23,13 @@ package fs2
 package grpc
 package server
 
-import scala.concurrent.duration._
 import cats.effect._
 import cats.effect.std.Dispatcher
 import cats.effect.testkit.TestContext
 import fs2.grpc.server.internal.Fs2UnaryServerCallHandler
 import io.grpc._
+
+import scala.concurrent.duration._
 
 class ServerSuite extends Fs2GrpcSuite {
 
@@ -225,6 +226,56 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.isDefined, true)
     assertEquals(dummy.currentStatus.get.isOk, false)
   }
+
+  runTest("streamingToStreaming send respects isReady") { (tc, d) =>
+    val dummy = new DummyServerCall
+
+    val listenerRef = Ref.unsafe[SyncIO, Option[ServerCall.Listener[_]]](None)
+    val handler = Fs2ServerCallHandler[IO](d, ServerOptions.default)
+      .streamingToStreamingCall[String, Int]((req, _) => unreadyAfterTwoEmissions(dummy, listenerRef).concurrently(req))
+    val listener = handler.startCall(dummy, new Metadata())
+    listenerRef.set(Some(listener)).unsafeRunSync()
+
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2))
+
+    dummy.setIsReady(true, listener)
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2, 3, 4, 5))
+  }
+
+  runTest("unaryToStreaming send respects isReady") { (tc, d) =>
+    val dummy = new DummyServerCall
+
+    val listenerRef = Ref.unsafe[SyncIO, Option[ServerCall.Listener[_]]](None)
+    val handler =
+      Fs2UnaryServerCallHandler.stream[IO, String, Int]((_, _) => unreadyAfterTwoEmissions(dummy, listenerRef), ServerOptions.default, d)
+
+    val listener = handler.startCall(dummy, new Metadata())
+    listenerRef.set(Some(listener)).unsafeRunSync()
+
+    listener.onMessage("a")
+    listener.onHalfClose()
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2))
+
+    dummy.setIsReady(true, listener)
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2, 3, 4, 5))
+  }
+
+  private def unreadyAfterTwoEmissions(dummy: DummyServerCall, listener: Ref[SyncIO, Option[ServerCall.Listener[_]]]) =
+    Stream.emits(List(1, 2, 3, 4, 5))
+      .chunkLimit(1)
+      .unchunks
+      .map { value =>
+        if (value == 3) dummy.setIsReady(false, listener.get.unsafeRunSync().get)
+        value
+      }
 
   runTest("streaming to unary")(streamingToUnary())
   runTest("streaming to unary with compression")(streamingToUnary(compressionOps))

@@ -146,6 +146,34 @@ class ClientSuite extends Fs2GrpcSuite {
 
   }
 
+  runTest0("stream to streamingToUnary - send respects readiness") { (tc, io, d) =>
+    val dummy = new DummyClientCall()
+    val client = fs2ClientCall(dummy, d)
+    val requests = Stream.emits(List("a", "b", "c", "d", "e"))
+      .chunkLimit(1)
+      .unchunks
+      .map { value =>
+        if (value == "c") dummy.setIsReady(false)
+        value
+      }
+
+    val result = client
+      .streamingToUnaryCall(requests, new Metadata())
+      .unsafeToFuture()(io)
+
+    tc.tick()
+
+    // Check that client has not sent messages when isReady == false
+    assertEquals(dummy.messagesSent.size, 2)
+    assertEquals(result.value, None)
+
+    dummy.setIsReady(true)
+    tc.tick()
+
+    // Check that client sends remaining messages after channel is ready
+    assertEquals(dummy.messagesSent.size, 5)
+  }
+
   runTest0("0-length to streamingToUnary") { (tc, io, d) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, d)
@@ -246,6 +274,36 @@ class ClientSuite extends Fs2GrpcSuite {
     assertEquals(dummy.messagesSent.size, 5)
     assertEquals(dummy.requested, 3)
 
+  }
+
+  runTest0("stream to streamingToStreaming - send respects readiness") { (tc, io, d) =>
+    val dummy = new DummyClientCall()
+    val client = fs2ClientCall(dummy, d)
+    val requests = Stream.emits(List("a", "b", "c", "d", "e"))
+      .chunkLimit(1)
+      .unchunks
+      .map { value =>
+        if (value == "c") dummy.setIsReady(false)
+        value
+      }
+
+    val result = client
+      .streamingToStreamingCall(requests, new Metadata())
+      .compile
+      .toList
+      .unsafeToFuture()(io)
+
+    tc.tick()
+
+    // Check that client has not sent messages when isReady == false
+    assertEquals(dummy.messagesSent.size, 2)
+    assertEquals(result.value, None)
+
+    dummy.setIsReady(true)
+    tc.tick()
+
+    // Check that client sends remaining messages after channel is ready
+    assertEquals(dummy.messagesSent.size, 5)
   }
 
   runTest0("cancellation for streamingToStreaming") { (tc, io, d) =>

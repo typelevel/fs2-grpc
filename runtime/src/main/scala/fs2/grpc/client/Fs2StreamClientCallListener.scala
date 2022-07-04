@@ -23,6 +23,7 @@ package fs2
 package grpc
 package client
 
+import cats.effect.SyncIO
 import cats.implicits._
 import cats.effect.kernel.Concurrent
 import cats.effect.std.Dispatcher
@@ -30,6 +31,7 @@ import io.grpc.{ClientCall, Metadata, Status}
 
 class Fs2StreamClientCallListener[F[_], Response] private (
     ingest: StreamIngest[F, Response],
+    signalReadiness: SyncIO[Unit],
     dispatcher: Dispatcher[F]
 ) extends ClientCall.Listener[Response] {
 
@@ -39,6 +41,8 @@ class Fs2StreamClientCallListener[F[_], Response] private (
   override def onClose(status: Status, trailers: Metadata): Unit =
     dispatcher.unsafeRunSync(ingest.onClose(GrpcStatus(status, trailers)))
 
+  override def onReady(): Unit = signalReadiness.unsafeRunSync()
+
   val stream: Stream[F, Response] = ingest.messages
 }
 
@@ -46,11 +50,12 @@ object Fs2StreamClientCallListener {
 
   private[client] def create[F[_]: Concurrent, Response](
       request: Int => F[Unit],
+      signalReadiness: SyncIO[Unit],
       dispatcher: Dispatcher[F],
       prefetchN: Int
   ): F[Fs2StreamClientCallListener[F, Response]] =
     StreamIngest[F, Response](request, prefetchN).map(
-      new Fs2StreamClientCallListener[F, Response](_, dispatcher)
+      new Fs2StreamClientCallListener[F, Response](_, signalReadiness, dispatcher)
     )
 
 }

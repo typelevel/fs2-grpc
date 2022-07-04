@@ -42,19 +42,19 @@ private[server] object Fs2ServerCall {
 }
 
 private[server] final class Fs2ServerCall[Request, Response](
-    call: ServerCall[Request, Response]
+    call: ServerCall[Request, Response],
 ) {
 
   import Fs2ServerCall.Cancel
 
-  def stream[F[_]](response: Stream[F, Response], dispatcher: Dispatcher[F])(implicit F: Sync[F]): SyncIO[Cancel] =
+  def stream[F[_]](sendStream: Stream[F, Response] => Stream[F, Unit], response: Stream[F, Response], dispatcher: Dispatcher[F])(implicit F: Sync[F]): SyncIO[Cancel] =
     run(
       response.pull.peek1
         .flatMap {
           case Some((_, stream)) =>
             Pull.suspend {
               call.sendHeaders(new Metadata())
-              stream.map(call.sendMessage).pull.echo
+              sendStream(stream).pull.echo
             }
           case None => Pull.done
         }

@@ -21,16 +21,14 @@
 
 package fs2.grpc.client.internal
 
-import cats.effect.Sync
-import cats.effect.SyncIO
+import cats.effect.kernel.{Async, Outcome, Ref}
 import cats.effect.syntax.all._
-import cats.effect.kernel.Async
-import cats.effect.kernel.Outcome
-import cats.effect.kernel.Ref
-import cats.syntax.functor._
+import cats.effect.{Sync, SyncIO}
 import cats.syntax.flatMap._
+import cats.syntax.functor._
 import fs2._
 import fs2.grpc.client.ClientOptions
+import fs2.grpc.shared.StreamOutput
 import io.grpc._
 
 private[client] object Fs2UnaryCallHandler {
@@ -65,7 +63,8 @@ private[client] object Fs2UnaryCallHandler {
   class Done[R] extends ReceiveState[R]
 
   private def mkListener[Response](
-      state: Ref[SyncIO, ReceiveState[Response]]
+      state: Ref[SyncIO, ReceiveState[Response]],
+      signalReadiness: SyncIO[Unit]
   ): ClientCall.Listener[Response] =
     new ClientCall.Listener[Response] {
       override def onMessage(message: Response): Unit =
@@ -110,6 +109,8 @@ private[client] object Fs2UnaryCallHandler {
           }
         }
       }.unsafeRunSync()
+
+      override def onReady(): Unit = signalReadiness.unsafeRunSync()
     }
 
   def unary[F[_], Request, Response](
@@ -119,7 +120,7 @@ private[client] object Fs2UnaryCallHandler {
       headers: Metadata
   )(implicit F: Async[F]): F[Response] = F.async[Response] { cb =>
     ReceiveState.init(cb, options.errorAdapter).map { state =>
-      call.start(mkListener[Response](state), headers)
+      call.start(mkListener[Response](state, SyncIO.unit), headers)
       // Initially ask for two responses from flow-control so that if a misbehaving server
       // sends more than one responses, we can catch it and fail it in the listener.
       call.request(2)
@@ -133,18 +134,15 @@ private[client] object Fs2UnaryCallHandler {
       call: ClientCall[Request, Response],
       options: ClientOptions,
       messages: Stream[F, Request],
+      output: StreamOutput[F, Request],
       headers: Metadata
   )(implicit F: Async[F]): F[Response] = F.async[Response] { cb =>
     ReceiveState.init(cb, options.errorAdapter).flatMap { state =>
-      call.start(mkListener[Response](state), headers)
+      call.start(mkListener[Response](state, output.onReady), headers)
       // Initially ask for two responses from flow-control so that if a misbehaving server
       // sends more than one responses, we can catch it and fail it in the listener.
       call.request(2)
-      messages
-        .map(call.sendMessage)
-        .compile
-        .drain
-        .guaranteeCase {
+      output.writeStream(messages).compile.drain.guaranteeCase {
           case Outcome.Succeeded(_) => F.delay(call.halfClose())
           case Outcome.Errored(e) => F.delay(call.cancel(e.getMessage, e))
           case Outcome.Canceled() => onCancel(call)

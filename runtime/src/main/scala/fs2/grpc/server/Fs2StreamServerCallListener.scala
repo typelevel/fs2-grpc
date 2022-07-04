@@ -26,12 +26,13 @@ package server
 import cats.Functor
 import cats.syntax.all._
 import cats.effect.kernel.Deferred
-import cats.effect.Async
+import cats.effect.{Async, SyncIO}
 import cats.effect.std.{Dispatcher, Queue}
 import io.grpc.ServerCall
 
 class Fs2StreamServerCallListener[F[_], Request, Response] private (
     requestQ: Queue[F, Option[Request]],
+    signalReadiness: SyncIO[Unit],
     val isCancelled: Deferred[F, Unit],
     val call: Fs2ServerCall[F, Request, Response],
     val dispatcher: Dispatcher[F]
@@ -47,6 +48,8 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
     dispatcher.unsafeRunSync(requestQ.offer(message.some))
   }
 
+  override def onReady(): Unit = signalReadiness.unsafeRunSync()
+
   override def onHalfClose(): Unit =
     dispatcher.unsafeRunSync(requestQ.offer(none))
 
@@ -60,13 +63,14 @@ object Fs2StreamServerCallListener {
 
     private[server] def apply[Request, Response](
         call: ServerCall[Request, Response],
+        signalReadiness: SyncIO[Unit],
         dispatcher: Dispatcher[F],
         options: ServerOptions
     )(implicit F: Async[F]): F[Fs2StreamServerCallListener[F, Request, Response]] = for {
       inputQ <- Queue.unbounded[F, Option[Request]]
       isCancelled <- Deferred[F, Unit]
       serverCall <- Fs2ServerCall[F, Request, Response](call, options)
-    } yield new Fs2StreamServerCallListener[F, Request, Response](inputQ, isCancelled, serverCall, dispatcher)
+    } yield new Fs2StreamServerCallListener[F, Request, Response](inputQ, signalReadiness, isCancelled, serverCall, dispatcher)
 
   }
 

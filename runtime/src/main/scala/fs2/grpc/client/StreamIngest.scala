@@ -27,26 +27,26 @@ import cats.implicits._
 import cats.effect.Concurrent
 import cats.effect.std.Queue
 
-private[client] trait StreamIngest[F[_], T] {
+private[grpc] trait StreamIngest[F[_], T] {
   def onMessage(msg: T): F[Unit]
-  def onClose(status: GrpcStatus): F[Unit]
+  def onClose(error: Option[Throwable]): F[Unit]
   def messages: Stream[F, T]
 }
 
-private[client] object StreamIngest {
+private[grpc] object StreamIngest {
 
   def apply[F[_]: Concurrent, T](
       request: Int => F[Unit],
       prefetchN: Int
   ): F[StreamIngest[F, T]] =
     Queue
-      .unbounded[F, Either[GrpcStatus, T]]
+      .unbounded[F, Either[Option[Throwable], T]]
       .map(q => create[F, T](request, prefetchN, q))
 
   def create[F[_], T](
       request: Int => F[Unit],
       prefetchN: Int,
-      queue: Queue[F, Either[GrpcStatus, T]]
+      queue: Queue[F, Either[Option[Throwable], T]]
   )(implicit F: Concurrent[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
 
     val limit: Int =
@@ -58,17 +58,16 @@ private[client] object StreamIngest {
     def onMessage(msg: T): F[Unit] =
       queue.offer(msg.asRight) *> ensureMessages
 
-    def onClose(status: GrpcStatus): F[Unit] =
-      queue.offer(status.asLeft)
+    def onClose(error: Option[Throwable]): F[Unit] =
+      queue.offer(error.asLeft)
 
     val messages: Stream[F, T] = {
 
       val run: F[Option[T]] =
         queue.take.flatMap {
           case Right(v) => ensureMessages *> v.some.pure[F]
-          case Left(GrpcStatus(status, trailers)) =>
-            if (!status.isOk) F.raiseError(status.asRuntimeException(trailers))
-            else none[T].pure[F]
+          case Left(Some(error)) => F.raiseError(error)
+          case Left(None) => none[T].pure[F]
         }
 
       Stream.repeatEval(run).unNoneTerminate

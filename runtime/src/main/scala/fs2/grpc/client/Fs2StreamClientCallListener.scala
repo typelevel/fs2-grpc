@@ -38,8 +38,10 @@ class Fs2StreamClientCallListener[F[_], Response] private (
   override def onMessage(message: Response): Unit =
     dispatcher.unsafeRunSync(ingest.onMessage(message))
 
-  override def onClose(status: Status, trailers: Metadata): Unit =
-    dispatcher.unsafeRunSync(ingest.onClose(GrpcStatus(status, trailers)))
+  override def onClose(status: Status, trailers: Metadata): Unit = {
+    val error = Option.when(!status.isOk)(status.asRuntimeException(trailers))
+    dispatcher.unsafeRunSync(ingest.onClose(error))
+  }
 
   override def onReady(): Unit = signalReadiness.unsafeRunSync()
 

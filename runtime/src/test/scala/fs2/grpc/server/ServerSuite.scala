@@ -303,4 +303,43 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
+  runTest("streamingToUnary back pressure") { (tc, d) =>
+    val dummy = new DummyServerCall
+    val deferred = d.unsafeRunSync(Deferred[IO, Unit])
+    val handler = Fs2ServerCallHandler[IO](d, ServerOptions.default)
+      .streamingToUnaryCall[String, Int]((requests, _) => {
+        requests.evalMap(_ => deferred.get).compile.drain.as(1)
+      })
+    val listener = handler.startCall(dummy, new Metadata())
+
+    tc.tick()
+
+    assertEquals(dummy.requested, 1)
+
+    listener.onMessage("1")
+    tc.tick()
+
+    listener.onMessage("2")
+    listener.onMessage("3")
+    tc.tick()
+
+    // requested should ideally be 2, however StreamIngest can double-request in some execution
+    // orderings if the push() is followed by pop() before the push checks the queue length.
+    val initialRequested = dummy.requested
+    assert(initialRequested == 2 || initialRequested == 3, s"expected requested to be 2 or 3, got ${initialRequested}")
+
+    // don't request any more messages while downstream is blocked
+    listener.onMessage("4")
+    listener.onMessage("5")
+    listener.onMessage("6")
+    tc.tick()
+
+    assertEquals(dummy.requested - initialRequested, 0)
+
+    // allow all messages through, the final pop() will trigger a new request
+    d.unsafeRunAndForget(deferred.complete(()))
+    tc.tick()
+
+    assertEquals(dummy.requested - initialRequested, 1)
+  }
 }

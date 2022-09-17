@@ -95,6 +95,7 @@ class ClientSuite extends Fs2GrpcSuite {
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 2)
 
+    Thread.sleep(10)
   }
 
   runTest0("error response to unaryToUnary") { (tc, io, d) =>

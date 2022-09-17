@@ -73,6 +73,9 @@ private[server] final class Fs2ServerCall[Request, Response](
       dispatcher
     )
 
+  def requestOnPull[F[_]](implicit F: Sync[F]): Pipe[F, Request, Request] =
+    _.chunks.flatMap(chunk => Stream.evalUnChunk(F.as(F.delay(call.request(chunk.size)), chunk)))
+
   def request(n: Int): SyncIO[Unit] =
     SyncIO(call.request(n))
 

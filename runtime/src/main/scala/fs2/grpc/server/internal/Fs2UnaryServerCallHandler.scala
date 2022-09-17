@@ -22,9 +22,7 @@
 package fs2.grpc.server.internal
 
 import cats.effect.Ref
-import cats.effect.Sync
 import cats.effect.SyncIO
-import cats.effect.std.Dispatcher
 import fs2.grpc.server.ServerCallOptions
 import fs2.grpc.server.ServerOptions
 import io.grpc._
@@ -88,40 +86,21 @@ private[server] object Fs2UnaryServerCallHandler {
         state.set(Cancelled()) >> call.close(status, new Metadata())
     }
 
-  def unary[F[_]: Sync, Request, Response](
-      impl: (Request, Metadata) => F[Response],
-      options: ServerOptions,
-      dispatcher: Dispatcher[F]
-  ): ServerCallHandler[Request, Response] =
+  def mkHandler[G[_], Request, Response](
+      impl: (Request, Metadata) => G[Response],
+      options: ServerOptions
+  )(start: (Fs2ServerCall[Request, Response], G[Response]) => SyncIO[Cancel]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
 
-      def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] =
-        startCallSync(call, opt)(call => req => call.unary(impl(req, headers), dispatcher)).unsafeRunSync()
+      def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
+        for {
+          call <- Fs2ServerCall.setup(opt, call)
+          // We expect only 1 request, but we ask for 2 requests here so that if a misbehaving client
+          // sends more than 1 requests, ServerCall will catch it.
+          _ <- call.request(2)
+          state <- CallerState.init[Request](req => start(call, impl(req, headers)))
+        } yield mkListener[Request, Response](call, state)
+      }.unsafeRunSync()
     }
-
-  def stream[F[_]: Sync, Request, Response](
-      impl: (Request, Metadata) => fs2.Stream[F, Response],
-      options: ServerOptions,
-      dispatcher: Dispatcher[F]
-  ): ServerCallHandler[Request, Response] =
-    new ServerCallHandler[Request, Response] {
-      private val opt = options.callOptionsFn(ServerCallOptions.default)
-
-      def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] =
-        startCallSync(call, opt)(call => req => call.stream(impl(req, headers), dispatcher)).unsafeRunSync()
-    }
-
-  private def startCallSync[F[_], Request, Response](
-      call: ServerCall[Request, Response],
-      options: ServerCallOptions
-  )(f: Fs2ServerCall[Request, Response] => Request => SyncIO[Cancel]): SyncIO[ServerCall.Listener[Request]] = {
-    for {
-      call <- Fs2ServerCall.setup(options, call)
-      // We expect only 1 request, but we ask for 2 requests here so that if a misbehaving client
-      // sends more than 1 requests, ServerCall will catch it.
-      _ <- call.request(2)
-      state <- CallerState.init(f(call))
-    } yield mkListener[Request, Response](call, state)
-  }
 }

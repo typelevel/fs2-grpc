@@ -23,58 +23,99 @@ package fs2
 package grpc
 package server
 
-import scala.concurrent.duration._
 import cats.effect._
 import cats.effect.std.Dispatcher
 import cats.effect.testkit.TestContext
-import fs2.grpc.server.internal.Fs2UnaryServerCallHandler
+import cats.effect.testkit.TestControl
 import io.grpc._
+import scala.concurrent.duration._
 
 class ServerSuite extends Fs2GrpcSuite {
 
   private val compressionOps =
     ServerOptions.default.configureCallOptions(_.withServerCompressor(Some(GzipCompressor)))
 
-  runTest("single message to unaryToUnary")(singleUnaryToUnary())
-  runTest("single message to unaryToUnary with compression")(singleUnaryToUnary(compressionOps))
+  private def startCall(
+      implement: Fs2ServerCallHandler[IO] => ServerCallHandler[String, Int],
+      serverOptions: ServerOptions = ServerOptions.default
+  )(call: ServerCall[String, Int], thunk: ServerCall.Listener[String] => IO[Unit]): IO[Unit] =
+    for {
+      releaseRef <- IO.ref[IO[Unit]](IO.unit)
+      startBarrier <- Deferred[IO, Unit]
+      tc <- TestControl.execute {
+        for {
+          allocated <- Dispatcher[IO].map(Fs2ServerCallHandler[IO](_, serverOptions)).allocated
+          (handler, release) = allocated
+          _ <- releaseRef.set(release)
+          listener <- IO(implement(handler).startCall(call, new Metadata()))
+          _ <- startBarrier.get
+          _ <- IO.defer(thunk(listener))
+        } yield ()
+      }
+      _ <- tc.tick
+      _ <- startBarrier.complete(())
+      _ <- tc.tickAll
+      _ <- releaseRef.get
+    } yield ()
 
-  private[this] def singleUnaryToUnary(
-      options: ServerOptions = ServerOptions.default
-  ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
-    val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int]((req, _) => IO(req.length), options, d)
-    val listener = handler.startCall(dummy, new Metadata())
+  private def syncCall(
+      fs: (ServerCall.Listener[String] => Unit)*
+  ): ServerCall.Listener[String] => IO[Unit] =
+    listener => IO(fs.foreach(_.apply(listener)))
 
-    listener.onMessage("123")
-    listener.onHalfClose()
-    tc.tick()
-
-    assertEquals(dummy.messages.size, 1)
-    assertEquals(dummy.messages(0), 3)
-    assertEquals(dummy.currentStatus.isDefined, true)
-    assertEquals(dummy.currentStatus.get.isOk, true)
+  test("unaryToUnary with compression") {
+    testCompression(_.unaryToUnaryCall((req, _) => IO(req.length)))
   }
 
-  runTest("cancellation for unaryToUnary") { (tc, d) =>
+  test("unaryToStream with compression") {
+    testCompression(_.unaryToStreamingCall((req, _) => Stream.emit(req.length).repeatN(5)))
+  }
+
+  test("streamToUnary with compression") {
+    testCompression(_.streamingToUnaryCall((req, _) => req.compile.foldMonoid.map(_.length)))
+  }
+
+  test("streamToStream with compression")(
+    testCompression(_.streamingToStreamingCall((req, _) => req.map(_.length)))
+  )
+
+  private def testCompression(sync: Fs2ServerCallHandler[IO] => ServerCallHandler[String, Int]): IO[Unit] = {
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int]((req, _) => IO(req.length), ServerOptions.default, d)
-    val listener = handler.startCall(dummy, new Metadata())
+    startCall(sync, compressionOps)(dummy, _ => IO.unit) >> IO {
+      assertEquals(dummy.explicitCompressor, Some("gzip"))
+    }
+  }
 
-    listener.onCancel()
-    tc.tick()
+  test("single message to unaryToUnary") {
+    val dummy = new DummyServerCall
+    startCall(_.unaryToUnaryCall((req, _) => IO(req.length)))(
+      dummy,
+      syncCall(_.onMessage("123"), _.onHalfClose())
+    ) >> IO {
+      assertEquals(dummy.explicitCompressor, None)
+      assertEquals(dummy.messages.size, 1)
+      assertEquals(dummy.messages(0), 3)
+      assertEquals(dummy.currentStatus.isDefined, true)
+      assertEquals(dummy.currentStatus.get.isOk, true)
+    }
+  }
 
-    assertEquals(dummy.currentStatus, None)
-    assertEquals(dummy.messages.length, 0)
+  test("cancellation for unaryToUnary") {
+    val dummy = new DummyServerCall
+    startCall(_.unaryToUnaryCall((req, _) => IO(req.length)))(
+      dummy,
+      syncCall(_.onCancel())
+    ) >> IO {
+      assertEquals(dummy.currentStatus, None)
+      assertEquals(dummy.messages.length, 0)
+    }
   }
 
   runTest("cancellation on the fly for unaryToUnary") { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int](
-      (req, _) => IO(req.length).delayBy(10.seconds),
-      ServerOptions.default,
-      d
-    )
-    val listener = handler.startCall(dummy, new Metadata())
+    val listener = Fs2ServerCallHandler[IO](d, ServerOptions.default)
+      .unaryToUnaryCall[String, Int]((req, _) => IO(req.length).delayBy(10.seconds))
+      .startCall(dummy, new Metadata())
 
     listener.onMessage("123")
     listener.onHalfClose()
@@ -93,8 +134,9 @@ class ServerSuite extends Fs2GrpcSuite {
       options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int]((req, _) => IO(req.length), options, d)
-    val listener = handler.startCall(dummy, new Metadata())
+    val listener = Fs2ServerCallHandler[IO](d, options)
+      .unaryToUnaryCall[String, Int]((req, _) => IO(req.length))
+      .startCall(dummy, new Metadata())
 
     listener.onMessage("123")
     listener.onMessage("456")
@@ -104,20 +146,14 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.map(_.getCode), Some(Status.Code.INTERNAL))
   }
 
-  runTest("no messages to unaryToUnary")(noMessageUnaryToUnary())
-  runTest("no messages to unaryToUnary with compression")(noMessageUnaryToUnary(compressionOps))
-
-  private def noMessageUnaryToUnary(
-      options: ServerOptions = ServerOptions.default
-  ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
+  test("no messages to unaryToUnary") {
     val dummy = new DummyServerCall
-    val handler = Fs2UnaryServerCallHandler.unary[IO, String, Int]((req, _) => IO(req.length), options, d)
-    val listener = handler.startCall(dummy, new Metadata())
-
-    listener.onHalfClose()
-    tc.tick()
-
-    assertEquals(dummy.currentStatus.map(_.getCode), Some(Status.Code.INTERNAL))
+    startCall(_.unaryToUnaryCall((req, _) => IO(req.length)))(
+      dummy,
+      syncCall(_.onHalfClose())
+    ) >> IO {
+      assertEquals(dummy.currentStatus.map(_.getCode), Some(Status.Code.INTERNAL))
+    }
   }
 
   runTest0("resource awaits termination of server") { (tc, r, _) =>
@@ -138,9 +174,9 @@ class ServerSuite extends Fs2GrpcSuite {
       options: ServerOptions = ServerOptions.default
   ): (TestContext, Dispatcher[IO]) => Unit = { (tc, d) =>
     val dummy = new DummyServerCall
-    val handler =
-      Fs2UnaryServerCallHandler.stream[IO, String, Int]((s, _) => Stream(s).map(_.length).repeat.take(5), options, d)
-    val listener = handler.startCall(dummy, new Metadata())
+    val listener = Fs2ServerCallHandler[IO](d, options)
+      .unaryToStreamingCall[String, Int]((s, _) => Stream(s).map(_.length).repeat.take(5))
+      .startCall(dummy, new Metadata())
 
     listener.onMessage("123")
     listener.onHalfClose()
@@ -168,19 +204,16 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
-  runTest("cancellation for streamingToStreaming") { (tc, d) =>
+  test("cancellation for streamingToStreaming") {
     val dummy = new DummyServerCall
-    val handler = Fs2ServerCallHandler[IO](d, ServerOptions.default)
-      .streamingToStreamingCall[String, Int]((_, _) =>
-        Stream.emit(3).repeat.take(5).zipLeft(Stream.awakeDelay[IO](1.seconds))
-      )
-    val listener = handler.startCall(dummy, new Metadata())
-
-    tc.tick()
-    listener.onCancel()
-    tc.tick()
-
-    assertEquals(dummy.currentStatus.map(_.getCode), Some(Status.Code.CANCELLED))
+    startCall(
+      _.streamingToStreamingCall((_, _) => Stream.emit(3).repeat.take(5).zipLeft(Stream.awakeDelay[IO](1.seconds)))
+    )(
+      dummy,
+      syncCall(_.onCancel())
+    ) >> IO {
+      assertEquals(dummy.currentStatus.map(_.getCode), Some(Status.Code.CANCELLED))
+    }
   }
 
   runTest("messages to streamingToStreaming")(multipleStreamingToStreaming())

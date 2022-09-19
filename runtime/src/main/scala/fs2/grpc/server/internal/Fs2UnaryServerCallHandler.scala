@@ -110,8 +110,8 @@ private[server] object Fs2UnaryServerCallHandler {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
 
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-        val outputStream = dispatcher.unsafeRunSync(StreamOutput.server(call, dispatcher))
-        startCallSync(call, outputStream.onReady, opt)(call => req => {
+        val outputStream = dispatcher.unsafeRunSync(StreamOutput.server(call))
+        startCallSync(call, outputStream.onReadySync(dispatcher), opt)(call => req => {
           call.stream(outputStream.writeStream, impl(req, headers), dispatcher)
         }).unsafeRunSync()
       }

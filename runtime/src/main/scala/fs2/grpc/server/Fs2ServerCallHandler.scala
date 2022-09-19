@@ -59,8 +59,8 @@ class Fs2ServerCallHandler[F[_]: Async] private (
       implementation: (Stream[F, Request], Metadata) => Stream[F, Response]
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
-      val (listener, streamOutput) = dispatcher.unsafeRunSync(StreamOutput.server(call, dispatcher).flatMap { output =>
-        Fs2StreamServerCallListener[F](call, output.onReady, dispatcher, options).map((_, output))
+      val (listener, streamOutput) = dispatcher.unsafeRunSync(StreamOutput.server(call).flatMap { output =>
+        Fs2StreamServerCallListener[F](call, output.onReadySync(dispatcher), dispatcher, options).map((_, output))
       })
       listener.unsafeStreamResponse(streamOutput, new Metadata(), implementation(_, headers))
       listener

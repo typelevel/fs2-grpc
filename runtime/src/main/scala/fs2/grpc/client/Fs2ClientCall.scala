@@ -64,8 +64,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     Fs2UnaryCallHandler.unary(call, options, message, headers)
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
-    StreamOutput.client(call, dispatcher).flatMap { output =>
-      Fs2UnaryCallHandler.stream(call, options, messages, output, headers)
+    StreamOutput.client(call).flatMap { output =>
+      Fs2UnaryCallHandler.stream(call, options, dispatcher, messages, output, headers)
     }
 
   def unaryToStreamingCall(message: Request, md: Metadata): Stream[F, Response] =
@@ -74,8 +74,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       .flatMap(Stream.exec(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
 
   def streamingToStreamingCall(messages: Stream[F, Request], md: Metadata): Stream[F, Response] = {
-    val listenerAndOutput = Resource.eval(StreamOutput.client(call, dispatcher)).flatMap { output =>
-      mkStreamListenerR(md, output.onReady).map((_, output))
+    val listenerAndOutput = Resource.eval(StreamOutput.client(call)).flatMap { output =>
+      mkStreamListenerR(md, output.onReadySync(dispatcher)).map((_, output))
     }
 
     Stream

@@ -22,6 +22,7 @@
 package fs2.grpc.client.internal
 
 import cats.effect.kernel.{Async, Outcome, Ref}
+import cats.effect.std.Dispatcher
 import cats.effect.syntax.all._
 import cats.effect.{Sync, SyncIO}
 import cats.syntax.flatMap._
@@ -133,12 +134,13 @@ private[client] object Fs2UnaryCallHandler {
   def stream[F[_], Request, Response](
       call: ClientCall[Request, Response],
       options: ClientOptions,
+      dispatcher: Dispatcher[F],
       messages: Stream[F, Request],
       output: StreamOutput[F, Request],
       headers: Metadata
   )(implicit F: Async[F]): F[Response] = F.async[Response] { cb =>
     ReceiveState.init(cb, options.errorAdapter).flatMap { state =>
-      call.start(mkListener[Response](state, output.onReady), headers)
+      call.start(mkListener[Response](state, output.onReadySync(dispatcher)), headers)
       // Initially ask for two responses from flow-control so that if a misbehaving server
       // sends more than one responses, we can catch it and fail it in the listener.
       call.request(2)

@@ -251,7 +251,11 @@ class ServerSuite extends Fs2GrpcSuite {
 
     val listenerRef = Ref.unsafe[SyncIO, Option[ServerCall.Listener[_]]](None)
     val handler =
-      Fs2UnaryServerCallHandler.stream[IO, String, Int]((_, _) => unreadyAfterTwoEmissions(dummy, listenerRef), ServerOptions.default, d)
+      Fs2UnaryServerCallHandler.stream[IO, String, Int](
+        (_, _) => unreadyAfterTwoEmissions(dummy, listenerRef),
+        ServerOptions.default,
+        d
+      )
 
     val listener = handler.startCall(dummy, new Metadata())
     listenerRef.set(Some(listener)).unsafeRunSync()
@@ -269,7 +273,8 @@ class ServerSuite extends Fs2GrpcSuite {
   }
 
   private def unreadyAfterTwoEmissions(dummy: DummyServerCall, listener: Ref[SyncIO, Option[ServerCall.Listener[_]]]) =
-    Stream.emits(List(1, 2, 3, 4, 5))
+    Stream
+      .emits(List(1, 2, 3, 4, 5))
       .chunkLimit(1)
       .unchunks
       .map { value =>

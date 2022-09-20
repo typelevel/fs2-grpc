@@ -71,7 +71,11 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   ): Unit =
     unsafeRun(handleUnaryResponse(headers, implementation(source)))
 
-  def unsafeStreamResponse(streamOutput: StreamOutput[F, Response], headers: Metadata, implementation: G[Request] => Stream[F, Response])(implicit
+  def unsafeStreamResponse(
+      streamOutput: StreamOutput[F, Response],
+      headers: Metadata,
+      implementation: G[Request] => Stream[F, Response]
+  )(implicit
       F: Async[F]
   ): Unit =
     unsafeRun(handleStreamResponse(headers, streamOutput.writeStream(implementation(source))))

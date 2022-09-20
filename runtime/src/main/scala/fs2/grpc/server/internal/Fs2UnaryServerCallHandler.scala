@@ -111,9 +111,11 @@ private[server] object Fs2UnaryServerCallHandler {
 
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
         val outputStream = dispatcher.unsafeRunSync(StreamOutput.server(call))
-        startCallSync(call, outputStream.onReadySync(dispatcher), opt)(call => req => {
-          call.stream(outputStream.writeStream, impl(req, headers), dispatcher)
-        }).unsafeRunSync()
+        startCallSync(call, outputStream.onReadySync(dispatcher), opt)(call =>
+          req => {
+            call.stream(outputStream.writeStream, impl(req, headers), dispatcher)
+          }
+        ).unsafeRunSync()
       }
     }
 

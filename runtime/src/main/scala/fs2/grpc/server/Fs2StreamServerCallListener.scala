@@ -69,7 +69,13 @@ object Fs2StreamServerCallListener {
       request = (n: Int) => F.delay(call.request(n))
       ingest <- StreamIngest[F, Request](request, prefetchN = 1)
       serverCall <- Fs2ServerCall[F, Request, Response](call, options)
-    } yield new Fs2StreamServerCallListener[F, Request, Response](ingest, signalReadiness, isCancelled, serverCall, dispatcher)
+    } yield new Fs2StreamServerCallListener[F, Request, Response](
+      ingest,
+      signalReadiness,
+      isCancelled,
+      serverCall,
+      dispatcher
+    )
 
   }
 

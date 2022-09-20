@@ -144,7 +144,11 @@ private[client] object Fs2UnaryCallHandler {
       // Initially ask for two responses from flow-control so that if a misbehaving server
       // sends more than one responses, we can catch it and fail it in the listener.
       call.request(2)
-      output.writeStream(messages).compile.drain.guaranteeCase {
+      output
+        .writeStream(messages)
+        .compile
+        .drain
+        .guaranteeCase {
           case Outcome.Succeeded(_) => F.delay(call.halfClose())
           case Outcome.Errored(e) => F.delay(call.cancel(e.getMessage, e))
           case Outcome.Canceled() => onCancel(call)

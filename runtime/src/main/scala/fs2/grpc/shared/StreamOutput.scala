@@ -36,47 +36,56 @@ private[grpc] trait StreamOutput[F[_], T] {
   def writeStream(s: Stream[F, T]): Stream[F, Unit]
 }
 
-private [grpc] object StreamOutput {
-  def client[F[_], Request, Response](c: ClientCall[Request, Response])
-    (implicit F: Async[F]): F[StreamOutput[F, Request]] = {
+private[grpc] object StreamOutput {
+  def client[F[_], Request, Response](
+      c: ClientCall[Request, Response]
+  )(implicit F: Async[F]): F[StreamOutput[F, Request]] = {
     SignallingRef[F].of(0L).map { readyState =>
       new StreamOutputImpl[F, Request](
         readyState,
         isReady = F.delay(c.isReady),
-        sendMessage = m => F.delay(c.sendMessage(m)))
+        sendMessage = m => F.delay(c.sendMessage(m))
+      )
     }
   }
 
-  def server[F[_], Request, Response](c: ServerCall[Request, Response])
-    (implicit F: Async[F]): F[StreamOutput[F, Response]] = {
+  def server[F[_], Request, Response](
+      c: ServerCall[Request, Response]
+  )(implicit F: Async[F]): F[StreamOutput[F, Response]] = {
     SignallingRef[F].of(0L).map { readyState =>
       new StreamOutputImpl[F, Response](
         readyState,
         isReady = F.delay(c.isReady),
-        sendMessage = m => F.delay(c.sendMessage(m)))
+        sendMessage = m => F.delay(c.sendMessage(m))
+      )
     }
   }
 }
 
 private[grpc] class StreamOutputImpl[F[_], T](
-  readyCountRef: SignallingRef[F, Long],
-  isReady: F[Boolean],
-  sendMessage: T => F[Unit],
-)(implicit F: Async[F]) extends StreamOutput[F, T] {
+    readyCountRef: SignallingRef[F, Long],
+    isReady: F[Boolean],
+    sendMessage: T => F[Unit]
+)(implicit F: Async[F])
+    extends StreamOutput[F, T] {
   override def onReady: F[Unit] = readyCountRef.update(_ + 1L)
 
   override def writeStream(s: Stream[F, T]): Stream[F, Unit] = s.evalMap(sendWhenReady)
 
   private def sendWhenReady(msg: T): F[Unit] = {
     val send = sendMessage(msg)
-    isReady.ifM(send, {
-      readyCountRef.get.flatMap { readyState =>
-        // If isReady is now true, don't wait (we may have missed the onReady signal)
-        isReady.ifM(send, {
-          // otherwise wait until readyState has been incremented
-          readyCountRef.waitUntil(_ > readyState) *> send
-        })
+    isReady.ifM(
+      send, {
+        readyCountRef.get.flatMap { readyState =>
+          // If isReady is now true, don't wait (we may have missed the onReady signal)
+          isReady.ifM(
+            send, {
+              // otherwise wait until readyState has been incremented
+              readyCountRef.waitUntil(_ > readyState) *> send
+            }
+          )
+        }
       }
-    })
+    )
   }
 }

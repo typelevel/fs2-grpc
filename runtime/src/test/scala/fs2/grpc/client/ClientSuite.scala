@@ -149,7 +149,8 @@ class ClientSuite extends Fs2GrpcSuite {
   runTest0("stream to streamingToUnary - send respects readiness") { (tc, io, d) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, d)
-    val requests = Stream.emits(List("a", "b", "c", "d", "e"))
+    val requests = Stream
+      .emits(List("a", "b", "c", "d", "e"))
       .chunkLimit(1)
       .unchunks
       .map { value =>
@@ -279,7 +280,8 @@ class ClientSuite extends Fs2GrpcSuite {
   runTest0("stream to streamingToStreaming - send respects readiness") { (tc, io, d) =>
     val dummy = new DummyClientCall()
     val client = fs2ClientCall(dummy, d)
-    val requests = Stream.emits(List("a", "b", "c", "d", "e"))
+    val requests = Stream
+      .emits(List("a", "b", "c", "d", "e"))
       .chunkLimit(1)
       .unchunks
       .map { value =>

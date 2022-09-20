@@ -81,7 +81,8 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     Stream
       .resource(listenerAndOutput)
       .flatMap { case (listener, output) =>
-        listener.stream.adaptError(ea)
+        listener.stream
+          .adaptError(ea)
           .concurrently(output.writeStream(messages) ++ Stream.eval(halfClose))
       }
   }
@@ -94,7 +95,10 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     case (_, Resource.ExitCase.Errored(t)) => cancel(t.getMessage.some, t.some)
   }
 
-  private def mkStreamListenerR(md: Metadata, signalReadiness: SyncIO[Unit]): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
+  private def mkStreamListenerR(
+      md: Metadata,
+      signalReadiness: SyncIO[Unit]
+  ): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
     val prefetchN = options.prefetchN.max(1)
     val create = Fs2StreamClientCallListener.create[F, Response](request, signalReadiness, dispatcher, prefetchN)
     val acquire = start(create, md) <* request(prefetchN)

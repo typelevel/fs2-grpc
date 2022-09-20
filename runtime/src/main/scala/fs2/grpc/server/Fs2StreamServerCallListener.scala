@@ -27,7 +27,7 @@ import cats.Functor
 import cats.syntax.all._
 import cats.effect.kernel.Deferred
 import cats.effect.{Async, SyncIO}
-import cats.effect.std.{Dispatcher, Queue}
+import cats.effect.std.Dispatcher
 import fs2.grpc.client.StreamIngest
 import io.grpc.ServerCall
 

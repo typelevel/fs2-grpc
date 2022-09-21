@@ -29,7 +29,7 @@ import cats.effect.kernel.Concurrent
 import cats.effect.std.Dispatcher
 import io.grpc.{ClientCall, Metadata, Status}
 
-class Fs2StreamClientCallListener[F[_], Response] private (
+private[client] class Fs2StreamClientCallListener[F[_], Response] private (
     ingest: StreamIngest[F, Response],
     signalReadiness: SyncIO[Unit],
     dispatcher: Dispatcher[F]
@@ -48,9 +48,9 @@ class Fs2StreamClientCallListener[F[_], Response] private (
   val stream: Stream[F, Response] = ingest.messages
 }
 
-object Fs2StreamClientCallListener {
+private[client] object Fs2StreamClientCallListener {
 
-  private[client] def create[F[_]: Concurrent, Response](
+  def create[F[_]: Concurrent, Response](
       request: Int => F[Unit],
       signalReadiness: SyncIO[Unit],
       dispatcher: Dispatcher[F],

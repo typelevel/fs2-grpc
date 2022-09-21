@@ -31,7 +31,7 @@ import cats.effect.std.Dispatcher
 import fs2.grpc.client.StreamIngest
 import io.grpc.ServerCall
 
-class Fs2StreamServerCallListener[F[_], Request, Response] private (
+private[server] class Fs2StreamServerCallListener[F[_], Request, Response] private (
     ingest: StreamIngest[F, Request],
     signalReadiness: SyncIO[Unit],
     val isCancelled: Deferred[F, Unit],
@@ -55,11 +55,11 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
   override def source: Stream[F, Request] = ingest.messages
 }
 
-object Fs2StreamServerCallListener {
+private[server] object Fs2StreamServerCallListener {
 
   class PartialFs2StreamServerCallListener[F[_]](val dummy: Boolean = false) extends AnyVal {
 
-    private[server] def apply[Request, Response](
+    def apply[Request, Response](
         call: ServerCall[Request, Response],
         signalReadiness: SyncIO[Unit],
         dispatcher: Dispatcher[F],
@@ -79,6 +79,6 @@ object Fs2StreamServerCallListener {
 
   }
 
-  private[server] def apply[F[_]] = new PartialFs2StreamServerCallListener[F]
+  def apply[F[_]] = new PartialFs2StreamServerCallListener[F]
 
 }

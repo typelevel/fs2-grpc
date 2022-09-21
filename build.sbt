@@ -2,7 +2,7 @@ import com.typesafe.tools.mima.core._
 import com.typesafe.tools.mima.core.ProblemFilters._
 import Dependencies._
 
-lazy val Scala3 = "3.1.3"
+lazy val Scala3 = "3.2.0"
 lazy val Scala213 = "2.13.8"
 lazy val Scala212 = "2.12.17"
 
@@ -15,7 +15,7 @@ inThisBuild(
   List(
     scalaVersion := Scala3,
     crossScalaVersions := List(Scala212, Scala213, Scala3),
-    tlBaseVersion := "2.4",
+    tlBaseVersion := "2.5",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organizationName := "Gary Coady / Fs2 Grpc Developers",

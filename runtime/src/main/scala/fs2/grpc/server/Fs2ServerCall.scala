@@ -33,7 +33,7 @@ private[server] class Fs2ServerCall[F[_], Request, Response](val call: ServerCal
   def closeStream(status: Status, trailers: Metadata)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.close(status, trailers))
 
-  def sendMessage(message: Response)(implicit F: Sync[F]): F[Unit] =
+  def sendSingleMessage(message: Response)(implicit F: Sync[F]): F[Unit] =
     F.delay(call.sendMessage(message))
 
   def request(numMessages: Int)(implicit F: Sync[F]): F[Unit] =

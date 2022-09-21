@@ -21,12 +21,10 @@
 
 package fs2.grpc.server.internal
 
-import cats.effect.Ref
-import cats.effect.Sync
-import cats.effect.SyncIO
 import cats.effect.std.Dispatcher
-import fs2.grpc.server.ServerCallOptions
-import fs2.grpc.server.ServerOptions
+import cats.effect.{Async, Ref, Sync, SyncIO}
+import fs2.grpc.server.{ServerCallOptions, ServerOptions}
+import fs2.grpc.shared.StreamOutput
 import io.grpc._
 
 private[server] object Fs2UnaryServerCallHandler {
@@ -49,6 +47,7 @@ private[server] object Fs2UnaryServerCallHandler {
 
   private def mkListener[Request, Response](
       call: Fs2ServerCall[Request, Response],
+      signalReadiness: SyncIO[Unit],
       state: Ref[SyncIO, CallerState[Request]]
   ): ServerCall.Listener[Request] =
     new ServerCall.Listener[Request] {
@@ -84,6 +83,8 @@ private[server] object Fs2UnaryServerCallHandler {
           }
           .unsafeRunSync()
 
+      override def onReady(): Unit = signalReadiness.unsafeRunSync()
+
       private def sendError(status: Status): SyncIO[Unit] =
         state.set(Cancelled()) >> call.close(status, new Metadata())
     }
@@ -97,23 +98,30 @@ private[server] object Fs2UnaryServerCallHandler {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
 
       def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] =
-        startCallSync(call, opt)(call => req => call.unary(impl(req, headers), dispatcher)).unsafeRunSync()
+        startCallSync(call, SyncIO.unit, opt)(call => req => call.unary(impl(req, headers), dispatcher)).unsafeRunSync()
     }
 
-  def stream[F[_]: Sync, Request, Response](
+  def stream[F[_], Request, Response](
       impl: (Request, Metadata) => fs2.Stream[F, Response],
       options: ServerOptions,
       dispatcher: Dispatcher[F]
-  ): ServerCallHandler[Request, Response] =
+  )(implicit F: Async[F]): ServerCallHandler[Request, Response] =
     new ServerCallHandler[Request, Response] {
       private val opt = options.callOptionsFn(ServerCallOptions.default)
 
-      def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] =
-        startCallSync(call, opt)(call => req => call.stream(impl(req, headers), dispatcher)).unsafeRunSync()
+      def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
+        val outputStream = dispatcher.unsafeRunSync(StreamOutput.server(call))
+        startCallSync(call, outputStream.onReadySync(dispatcher), opt)(call =>
+          req => {
+            call.stream(outputStream.writeStream, impl(req, headers), dispatcher)
+          }
+        ).unsafeRunSync()
+      }
     }
 
   private def startCallSync[F[_], Request, Response](
       call: ServerCall[Request, Response],
+      signalReadiness: SyncIO[Unit],
       options: ServerCallOptions
   )(f: Fs2ServerCall[Request, Response] => Request => SyncIO[Cancel]): SyncIO[ServerCall.Listener[Request]] = {
     for {
@@ -122,6 +130,6 @@ private[server] object Fs2UnaryServerCallHandler {
       // sends more than 1 requests, ServerCall will catch it.
       _ <- call.request(2)
       state <- CallerState.init(f(call))
-    } yield mkListener[Request, Response](call, state)
+    } yield mkListener[Request, Response](call, signalReadiness, state)
   }
 }

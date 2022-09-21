@@ -30,6 +30,7 @@ class DummyClientCall extends ClientCall[String, Int] {
   var requested: Int = 0
   val messagesSent: ArrayBuffer[String] = ArrayBuffer[String]()
   var listener: Option[ClientCall.Listener[Int]] = None
+  var ready = true
   var cancelled: Option[(String, Throwable)] = None
   var halfClosed = false
 
@@ -47,5 +48,14 @@ class DummyClientCall extends ClientCall[String, Int] {
   override def sendMessage(message: String): Unit = {
     messagesSent += message
     ()
+  }
+
+  override def isReady: Boolean = ready
+
+  def setIsReady(value: Boolean): Unit = {
+    ready = value
+    if (value) {
+      listener.get.onReady()
+    }
   }
 }

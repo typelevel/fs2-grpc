@@ -23,12 +23,13 @@ package fs2
 package grpc
 package server
 
-import scala.concurrent.duration._
 import cats.effect._
 import cats.effect.std.Dispatcher
 import cats.effect.testkit.TestContext
 import fs2.grpc.server.internal.Fs2UnaryServerCallHandler
 import io.grpc._
+
+import scala.concurrent.duration._
 
 class ServerSuite extends Fs2GrpcSuite {
 
@@ -226,6 +227,61 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, false)
   }
 
+  runTest("streamingToStreaming send respects isReady") { (tc, d) =>
+    val dummy = new DummyServerCall
+
+    val listenerRef = Ref.unsafe[SyncIO, Option[ServerCall.Listener[_]]](None)
+    val handler = Fs2ServerCallHandler[IO](d, ServerOptions.default)
+      .streamingToStreamingCall[String, Int]((req, _) => unreadyAfterTwoEmissions(dummy, listenerRef).concurrently(req))
+    val listener = handler.startCall(dummy, new Metadata())
+    listenerRef.set(Some(listener)).unsafeRunSync()
+
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2))
+
+    dummy.setIsReady(true, listener)
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2, 3, 4, 5))
+  }
+
+  runTest("unaryToStreaming send respects isReady") { (tc, d) =>
+    val dummy = new DummyServerCall
+
+    val listenerRef = Ref.unsafe[SyncIO, Option[ServerCall.Listener[_]]](None)
+    val handler =
+      Fs2UnaryServerCallHandler.stream[IO, String, Int](
+        (_, _) => unreadyAfterTwoEmissions(dummy, listenerRef),
+        ServerOptions.default,
+        d
+      )
+
+    val listener = handler.startCall(dummy, new Metadata())
+    listenerRef.set(Some(listener)).unsafeRunSync()
+
+    listener.onMessage("a")
+    listener.onHalfClose()
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2))
+
+    dummy.setIsReady(true, listener)
+    tc.tick()
+
+    assertEquals(dummy.messages.toList, List(1, 2, 3, 4, 5))
+  }
+
+  private def unreadyAfterTwoEmissions(dummy: DummyServerCall, listener: Ref[SyncIO, Option[ServerCall.Listener[_]]]) =
+    Stream
+      .emits(List(1, 2, 3, 4, 5))
+      .chunkLimit(1)
+      .unchunks
+      .map { value =>
+        if (value == 3) dummy.setIsReady(false, listener.get.unsafeRunSync().get)
+        value
+      }
+
   runTest("streaming to unary")(streamingToUnary())
   runTest("streaming to unary with compression")(streamingToUnary(compressionOps))
 
@@ -252,4 +308,43 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
+  runTest("streamingToUnary back pressure") { (tc, d) =>
+    val dummy = new DummyServerCall
+    val deferred = d.unsafeRunSync(Deferred[IO, Unit])
+    val handler = Fs2ServerCallHandler[IO](d, ServerOptions.default)
+      .streamingToUnaryCall[String, Int]((requests, _) => {
+        requests.evalMap(_ => deferred.get).compile.drain.as(1)
+      })
+    val listener = handler.startCall(dummy, new Metadata())
+
+    tc.tick()
+
+    assertEquals(dummy.requested, 1)
+
+    listener.onMessage("1")
+    tc.tick()
+
+    listener.onMessage("2")
+    listener.onMessage("3")
+    tc.tick()
+
+    // requested should ideally be 2, however StreamIngest can double-request in some execution
+    // orderings if the push() is followed by pop() before the push checks the queue length.
+    val initialRequested = dummy.requested
+    assert(initialRequested == 2 || initialRequested == 3, s"expected requested to be 2 or 3, got ${initialRequested}")
+
+    // don't request any more messages while downstream is blocked
+    listener.onMessage("4")
+    listener.onMessage("5")
+    listener.onMessage("6")
+    tc.tick()
+
+    assertEquals(dummy.requested - initialRequested, 0)
+
+    // allow all messages through, the final pop() will trigger a new request
+    d.unsafeRunAndForget(deferred.complete(()))
+    tc.tick()
+
+    assertEquals(dummy.requested - initialRequested, 1)
+  }
 }

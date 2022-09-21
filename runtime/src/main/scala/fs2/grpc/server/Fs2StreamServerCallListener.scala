@@ -26,12 +26,14 @@ package server
 import cats.Functor
 import cats.syntax.all._
 import cats.effect.kernel.Deferred
-import cats.effect.Async
-import cats.effect.std.{Dispatcher, Queue}
+import cats.effect.{Async, SyncIO}
+import cats.effect.std.Dispatcher
+import fs2.grpc.client.StreamIngest
 import io.grpc.ServerCall
 
-class Fs2StreamServerCallListener[F[_], Request, Response] private (
-    requestQ: Queue[F, Option[Request]],
+private[server] class Fs2StreamServerCallListener[F[_], Request, Response] private (
+    ingest: StreamIngest[F, Request],
+    signalReadiness: SyncIO[Unit],
     val isCancelled: Deferred[F, Unit],
     val call: Fs2ServerCall[F, Request, Response],
     val dispatcher: Dispatcher[F]
@@ -42,34 +44,41 @@ class Fs2StreamServerCallListener[F[_], Request, Response] private (
   override def onCancel(): Unit =
     dispatcher.unsafeRunSync(isCancelled.complete(()).void)
 
-  override def onMessage(message: Request): Unit = {
-    call.call.request(1)
-    dispatcher.unsafeRunSync(requestQ.offer(message.some))
-  }
+  override def onMessage(message: Request): Unit =
+    dispatcher.unsafeRunSync(ingest.onMessage(message))
+
+  override def onReady(): Unit = signalReadiness.unsafeRunSync()
 
   override def onHalfClose(): Unit =
-    dispatcher.unsafeRunSync(requestQ.offer(none))
+    dispatcher.unsafeRunSync(ingest.onClose(None))
 
-  override def source: Stream[F, Request] =
-    Stream.repeatEval(requestQ.take).unNoneTerminate
+  override def source: Stream[F, Request] = ingest.messages
 }
 
-object Fs2StreamServerCallListener {
+private[server] object Fs2StreamServerCallListener {
 
   class PartialFs2StreamServerCallListener[F[_]](val dummy: Boolean = false) extends AnyVal {
 
-    private[server] def apply[Request, Response](
+    def apply[Request, Response](
         call: ServerCall[Request, Response],
+        signalReadiness: SyncIO[Unit],
         dispatcher: Dispatcher[F],
         options: ServerOptions
     )(implicit F: Async[F]): F[Fs2StreamServerCallListener[F, Request, Response]] = for {
-      inputQ <- Queue.unbounded[F, Option[Request]]
       isCancelled <- Deferred[F, Unit]
+      request = (n: Int) => F.delay(call.request(n))
+      ingest <- StreamIngest[F, Request](request, prefetchN = 1)
       serverCall <- Fs2ServerCall[F, Request, Response](call, options)
-    } yield new Fs2StreamServerCallListener[F, Request, Response](inputQ, isCancelled, serverCall, dispatcher)
+    } yield new Fs2StreamServerCallListener[F, Request, Response](
+      ingest,
+      signalReadiness,
+      isCancelled,
+      serverCall,
+      dispatcher
+    )
 
   }
 
-  private[server] def apply[F[_]] = new PartialFs2StreamServerCallListener[F]
+  def apply[F[_]] = new PartialFs2StreamServerCallListener[F]
 
 }

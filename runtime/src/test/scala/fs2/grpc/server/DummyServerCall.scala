@@ -30,8 +30,12 @@ import scala.collection.mutable.ArrayBuffer
 class DummyServerCall extends ServerCall[String, Int] {
   val messages: ArrayBuffer[Int] = ArrayBuffer[Int]()
   var currentStatus: Option[Status] = None
+  var requested: Int = 0
+  var ready: Boolean = true
 
-  override def request(numMessages: Int): Unit = ()
+  override def request(numMessages: Int): Unit = {
+    requested += numMessages
+  }
   override def sendMessage(message: Int): Unit = {
     messages += message
     ()
@@ -44,4 +48,12 @@ class DummyServerCall extends ServerCall[String, Int] {
     currentStatus = Some(status)
   }
   override def isCancelled: Boolean = false
+
+  override def isReady: Boolean = ready
+  def setIsReady(value: Boolean, listener: ServerCall.Listener[_]): Unit = {
+    ready = value
+    if (ready) {
+      listener.onReady()
+    }
+  }
 }

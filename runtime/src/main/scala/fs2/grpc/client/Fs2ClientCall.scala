@@ -23,11 +23,12 @@ package fs2
 package grpc
 package client
 
-import cats.syntax.all._
-import cats.effect.{Async, Resource}
 import cats.effect.std.Dispatcher
+import cats.effect.{Async, Resource, SyncIO}
+import cats.syntax.all._
 import fs2.grpc.client.internal.Fs2UnaryCallHandler
-import io.grpc.{Metadata, _}
+import fs2.grpc.shared.StreamOutput
+import io.grpc._
 
 final case class UnaryResult[A](value: Option[A], status: Option[GrpcStatus])
 final case class GrpcStatus(status: Status, trailers: Metadata)
@@ -51,17 +52,11 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   private def request(numMessages: Int): F[Unit] =
     F.delay(call.request(numMessages))
 
-  private def sendMessage(message: Request): F[Unit] =
-    F.delay(call.sendMessage(message))
-
   private def start[A <: ClientCall.Listener[Response]](createListener: F[A], md: Metadata): F[A] =
     createListener.flatTap(l => F.delay(call.start(l, md)))
 
   private def sendSingleMessage(message: Request): F[Unit] =
-    sendMessage(message) *> halfClose
-
-  private def sendStream(stream: Stream[F, Request]): Stream[F, Unit] =
-    stream.evalMap(sendMessage) ++ Stream.eval(halfClose)
+    F.delay(call.sendMessage(message)) *> halfClose
 
   //
 
@@ -69,17 +64,28 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     Fs2UnaryCallHandler.unary(call, options, message, headers)
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
-    Fs2UnaryCallHandler.stream(call, options, messages, headers)
+    StreamOutput.client(call).flatMap { output =>
+      Fs2UnaryCallHandler.stream(call, options, dispatcher, messages, output, headers)
+    }
 
   def unaryToStreamingCall(message: Request, md: Metadata): Stream[F, Response] =
     Stream
-      .resource(mkStreamListenerR(md))
+      .resource(mkStreamListenerR(md, SyncIO.unit))
       .flatMap(Stream.exec(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
 
-  def streamingToStreamingCall(messages: Stream[F, Request], md: Metadata): Stream[F, Response] =
+  def streamingToStreamingCall(messages: Stream[F, Request], md: Metadata): Stream[F, Response] = {
+    val listenerAndOutput = Resource.eval(StreamOutput.client(call)).flatMap { output =>
+      mkStreamListenerR(md, output.onReadySync(dispatcher)).map((_, output))
+    }
+
     Stream
-      .resource(mkStreamListenerR(md))
-      .flatMap(_.stream.adaptError(ea).concurrently(sendStream(messages)))
+      .resource(listenerAndOutput)
+      .flatMap { case (listener, output) =>
+        listener.stream
+          .adaptError(ea)
+          .concurrently(output.writeStream(messages) ++ Stream.eval(halfClose))
+      }
+  }
 
   //
 
@@ -89,10 +95,12 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
     case (_, Resource.ExitCase.Errored(t)) => cancel(t.getMessage.some, t.some)
   }
 
-  private def mkStreamListenerR(md: Metadata): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
-
+  private def mkStreamListenerR(
+      md: Metadata,
+      signalReadiness: SyncIO[Unit]
+  ): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
     val prefetchN = options.prefetchN.max(1)
-    val create = Fs2StreamClientCallListener.create[F, Response](request, dispatcher, prefetchN)
+    val create = Fs2StreamClientCallListener.create[F, Response](request, signalReadiness, dispatcher, prefetchN)
     val acquire = start(create, md) <* request(prefetchN)
     val release = handleExitCase(cancelSucceed = true)
 

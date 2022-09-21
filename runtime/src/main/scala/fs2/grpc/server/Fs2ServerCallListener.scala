@@ -23,9 +23,10 @@ package fs2
 package grpc
 package server
 
-import cats.syntax.all._
 import cats.effect._
 import cats.effect.std.Dispatcher
+import cats.syntax.all._
+import fs2.grpc.shared.StreamOutput
 import io.grpc.{Metadata, Status, StatusException, StatusRuntimeException}
 
 private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
@@ -49,10 +50,10 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   }
 
   private def handleUnaryResponse(headers: Metadata, response: F[Response])(implicit F: Sync[F]): F[Unit] =
-    call.sendHeaders(headers) *> call.request(1) *> response >>= call.sendMessage
+    call.sendHeaders(headers) *> call.request(1) *> response >>= call.sendSingleMessage
 
-  private def handleStreamResponse(headers: Metadata, response: Stream[F, Response])(implicit F: Sync[F]): F[Unit] =
-    call.sendHeaders(headers) *> call.request(1) *> response.evalMap(call.sendMessage).compile.drain
+  private def handleStreamResponse(headers: Metadata, sendResponse: Stream[F, Unit])(implicit F: Sync[F]): F[Unit] =
+    call.sendHeaders(headers) *> call.request(1) *> sendResponse.compile.drain
 
   private def unsafeRun(f: F[Unit])(implicit F: Async[F]): Unit = {
     val bracketed = F.guaranteeCase(f) {
@@ -70,8 +71,12 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   ): Unit =
     unsafeRun(handleUnaryResponse(headers, implementation(source)))
 
-  def unsafeStreamResponse(headers: Metadata, implementation: G[Request] => Stream[F, Response])(implicit
+  def unsafeStreamResponse(
+      streamOutput: StreamOutput[F, Response],
+      headers: Metadata,
+      implementation: G[Request] => Stream[F, Response]
+  )(implicit
       F: Async[F]
   ): Unit =
-    unsafeRun(handleStreamResponse(headers, implementation(source)))
+    unsafeRun(handleStreamResponse(headers, streamOutput.writeStream(implementation(source))))
 }

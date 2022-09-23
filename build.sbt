@@ -56,7 +56,7 @@ lazy val codegen = project
   .settings(
     name := "fs2-grpc-codegen",
     scalaVersion := Scala212,
-    crossScalaVersions := List(Scala212),
+    crossScalaVersions := List(Scala212, Scala213),
     libraryDependencies += scalaPbCompiler
   )
 

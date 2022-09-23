@@ -27,7 +27,7 @@ import com.google.protobuf.compiler.PluginProtos
 import protocgen.{CodeGenApp, CodeGenRequest, CodeGenResponse}
 import scalapb.compiler.{DescriptorImplicits, FunctionalPrinter, GeneratorParams}
 import scalapb.options.Scalapb
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 final case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
 
@@ -47,7 +47,7 @@ object Fs2CodeGenerator extends CodeGenApp {
       b.setName(file.scalaDirectory + "/" + service.name + s"${fs2params.serviceSuffix}.scala")
       b.setContent(code)
       b.build
-    }
+    }.toSeq
   }
 
   private def parseParameters(params: String): Either[String, (GeneratorParams, Fs2Params)] =

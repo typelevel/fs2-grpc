@@ -91,6 +91,18 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     p.add(s".addMethod($descriptor, $handler((r, m) => $eval.flatMap($serviceCall(r, _))))")
   }
 
+  private[this] def serviceBindingResourceImplementation(method: MethodDescriptor): PrinterEndo = { p =>
+    val inType = method.inputType.scalaType
+    val outType = method.outputType.scalaType
+    val descriptor = method.grpcDescriptor.fullName
+    val handler = s"$Fs2ServerCallHandler[F](dispatcher, serverOptions).${handleMethod(method)}[$inType, $outType]"
+
+    val serviceCall = s"serviceImpl.${method.name}"
+    val eval = if (method.isServerStreaming) s"$Stream.resource[F, A](mkCtx(m)).flatMap" else "mkCtx(m).use"
+
+    p.add(s".addMethod($descriptor, $handler((r, m) => $eval($serviceCall(r, _))))")
+  }
+
   private[this] def serviceMethods: PrinterEndo = _.seq(service.methods.map(serviceMethodSignature))
 
   private[this] def serviceMethodImplementations: PrinterEndo =
@@ -103,6 +115,13 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
       .add(".build()")
       .outdent
 
+  private[this] def serviceBindingResourceImplementations: PrinterEndo =
+    _.indent
+      .add(s".builder(${service.grpcDescriptor.fullName})")
+      .call(service.methods.map(serviceBindingResourceImplementation): _*)
+      .add(".build()")
+      .outdent
+
   private[this] def serviceTrait: PrinterEndo =
     _.add(s"trait $serviceNameFs2[F[_], $Ctx] {").indent.call(serviceMethods).outdent.add("}")
 
@@ -111,6 +130,8 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
       .call(serviceClient)
       .newline
       .call(serviceBinding)
+      .newline
+      .call(serviceBindingResource)
       .outdent
       .newline
       .add("}")
@@ -130,6 +151,16 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     ).indent
       .add(s"$ServerServiceDefinition")
       .call(serviceBindingImplementations)
+      .outdent
+      .add("}")
+  }
+
+  private[this] def serviceBindingResource: PrinterEndo = {
+    _.add(
+      s"protected def serviceBindingResource[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Ctx], mkCtx: $Metadata => $Resource[F, $Ctx], serverOptions: $ServerOptions): $ServerServiceDefinition = {"
+    ).indent
+      .add(s"$ServerServiceDefinition")
+      .call(serviceBindingResourceImplementations)
       .outdent
       .add("}")
   }

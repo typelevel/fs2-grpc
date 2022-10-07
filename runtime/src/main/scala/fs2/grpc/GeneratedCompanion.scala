@@ -54,7 +54,7 @@ trait GeneratedCompanion[Service[*[_], _]] {
       mkMetadata: A => F[Metadata],
       clientOptions: ClientOptions
   ): Resource[F, Service[F, A]] =
-    Dispatcher[F].map(mkClient[F, A](_, channel, mkMetadata, clientOptions))
+    Dispatcher.parallel[F].map(mkClient[F, A](_, channel, mkMetadata, clientOptions))
 
   final def mkClientResource[F[_]: Async, A](
       channel: Channel,
@@ -151,7 +151,7 @@ trait GeneratedCompanion[Service[*[_], _]] {
       f: Metadata => F[A],
       serverOptions: ServerOptions
   ): Resource[F, ServerServiceDefinition] =
-    Dispatcher[F].map(service[F, A](_, serviceImpl, f, serverOptions))
+    Dispatcher.parallel[F].map(service[F, A](_, serviceImpl, f, serverOptions))
 
   final def serviceResource[F[_]: Async, A](
       serviceImpl: Service[F, A],

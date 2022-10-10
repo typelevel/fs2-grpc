@@ -74,8 +74,8 @@ class Fs2GrpcSuite extends CatsEffectSuite with CatsEffectFunFixtures {
       }
 
       body(ec, r, fakeDispatcher)
-      shutdown.unsafeRunAndForget()
       ec.tickAll()
+      shutdown.unsafeRunAndForget()
     }
   }
 }

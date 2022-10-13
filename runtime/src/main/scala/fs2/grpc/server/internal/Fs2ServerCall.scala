@@ -85,11 +85,15 @@ private[server] final class Fs2ServerCall[Request, Response](
 
   private def run[F[_]](completed: F[Unit], dispatcher: Dispatcher[F])(implicit F: Sync[F]): SyncIO[Cancel] = {
     SyncIO {
-      val cancel = dispatcher.unsafeRunCancelable(F.guaranteeCase(completed) {
-        case Outcome.Succeeded(_) => close(Status.OK, new Metadata()).to[F]
-        case Outcome.Errored(e) => handleError(e).to[F]
-        case Outcome.Canceled() => close(Status.CANCELLED, new Metadata()).to[F]
-      })
+      val cancel = dispatcher.unsafeRunCancelable(
+        F.handleError {
+          F.guaranteeCase(completed) {
+            case Outcome.Succeeded(_) => close(Status.OK, new Metadata()).to[F]
+            case Outcome.Errored(e) => handleError(e).to[F]
+            case Outcome.Canceled() => close(Status.CANCELLED, new Metadata()).to[F]
+          }
+        }(_ => ())
+      )
       SyncIO(cancel()).void
     }
   }

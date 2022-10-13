@@ -206,7 +206,32 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.currentStatus.get.isOk, true)
   }
 
-  runTest("messages to streamingToStreaming with error") { (tc, d) =>
+  runTest("messages to streamingToStreaming with error") { (tc, d0) =>
+    @volatile var errorInDispatcher = false
+    val d = new Dispatcher[IO] {
+      import scala.concurrent._
+      def unsafeToFutureCancelable[A](fa: IO[A]): (Future[A], () => Future[Unit]) = {
+        // d0.unsafeToFutureCancelable(fa)
+        implicit val parasitic: ExecutionContext = new ExecutionContext {
+          def execute(runnable: Runnable) = runnable.run()
+          def reportFailure(t: Throwable) = t.printStackTrace()
+        }
+
+        val (fut, cancel) = d0.unsafeToFutureCancelable(fa)
+        val reported = fut.transform(
+          identity,
+          t => {
+            errorInDispatcher = true
+            t
+          }
+        )
+        (reported, cancel)
+      }
+
+      override def unsafeRunSync[A](fa: IO[A]): A =
+        d0.unsafeRunSync(fa.onError(_ => IO { errorInDispatcher = true }))
+    }
+
     val dummy = new DummyServerCall
     val error = new RuntimeException("hello")
 
@@ -225,6 +250,7 @@ class ServerSuite extends Fs2GrpcSuite {
     assertEquals(dummy.messages.toList, List(1, 2, 0))
     assertEquals(dummy.currentStatus.isDefined, true)
     assertEquals(dummy.currentStatus.get.isOk, false)
+    assert(!errorInDispatcher, "no error should be encountered by the dispatcher")
   }
 
   runTest("streamingToStreaming send respects isReady") { (tc, d) =>

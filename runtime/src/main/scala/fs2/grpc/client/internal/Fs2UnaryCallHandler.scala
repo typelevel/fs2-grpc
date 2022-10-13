@@ -27,6 +27,7 @@ import cats.effect.syntax.all._
 import cats.effect.{Sync, SyncIO}
 import cats.syntax.flatMap._
 import cats.syntax.functor._
+import cats.syntax.applicativeError._
 import fs2._
 import fs2.grpc.client.ClientOptions
 import fs2.grpc.shared.StreamOutput
@@ -153,6 +154,7 @@ private[client] object Fs2UnaryCallHandler {
           case Outcome.Errored(e) => F.delay(call.cancel(e.getMessage, e))
           case Outcome.Canceled() => onCancel(call)
         }
+        .handleError(_ => ())
         .start
         .map(sending => Some(sending.cancel >> onCancel(call)))
     }

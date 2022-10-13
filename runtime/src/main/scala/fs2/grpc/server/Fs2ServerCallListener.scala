@@ -56,11 +56,14 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
     call.sendHeaders(headers) *> call.request(1) *> sendResponse.compile.drain
 
   private def unsafeRun(f: F[Unit])(implicit F: Async[F]): Unit = {
-    val bracketed = F.guaranteeCase(f) {
-      case Outcome.Succeeded(_) => call.closeStream(Status.OK, new Metadata())
-      case Outcome.Canceled() => call.closeStream(Status.CANCELLED, new Metadata())
-      case Outcome.Errored(t) => reportError(t)
-    }
+    val bracketed =
+      F.handleError {
+        F.guaranteeCase(f) {
+          case Outcome.Succeeded(_) => call.closeStream(Status.OK, new Metadata())
+          case Outcome.Canceled() => call.closeStream(Status.CANCELLED, new Metadata())
+          case Outcome.Errored(t) => reportError(t)
+        }
+      }(_ => ())
 
     // Exceptions are reported by closing the call
     dispatcher.unsafeRunAndForget(F.race(bracketed, isCancelled.get))

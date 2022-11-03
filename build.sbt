@@ -44,8 +44,7 @@ inThisBuild(
   )
 )
 
-//
-val projects: Seq[ProjectReference] =
+lazy val projects =
   runtime.projectRefs ++ codegen.projectRefs ++ e2e.projectRefs ++ List(plugin.project, protocGen.agg.project)
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin, NoPublishPlugin)

@@ -6,6 +6,9 @@ lazy val Scala3 = "3.2.0"
 lazy val Scala213 = "2.13.10"
 lazy val Scala212 = "2.12.17"
 
+lazy val axesDefault =
+  Seq(VirtualAxis.scalaABIVersion(Scala213), VirtualAxis.jvm)
+
 Global / lintUnusedKeysOnLoad := false
 
 def dev(ghUser: String, name: String, email: String): Developer =
@@ -44,21 +47,24 @@ inThisBuild(
   )
 )
 
-//
+lazy val projects =
+  runtime.projectRefs ++ codegen.projectRefs ++ e2e.projectRefs ++ List(plugin.project, protocGen.agg.project)
 
-lazy val root = project
-  .in(file("."))
+lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin, NoPublishPlugin)
-  .aggregate(runtime, codegen, plugin, e2e, protocGen.agg)
+  .aggregate(projects: _*)
   .dependsOn(protocGen.agg)
 
-lazy val codegen = project
+lazy val codegen = (projectMatrix in file("codegen"))
+  .defaultAxes(axesDefault: _*)
   .settings(
     name := "fs2-grpc-codegen",
-    scalaVersion := Scala212,
-    crossScalaVersions := List(Scala212),
-    libraryDependencies += scalaPbCompiler
+    libraryDependencies += scalaPbCompiler,
+    tlMimaPreviousVersions := {
+      if (scalaVersion == Scala212) tlMimaPreviousVersions.value else Set() // Temporary
+    }
   )
+  .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
 
 lazy val codegenFullName =
   "fs2.grpc.codegen.Fs2CodeGenerator"
@@ -78,22 +84,26 @@ lazy val plugin = project
       sbtVersion,
       organization,
       "grpcVersion" -> versions.grpc,
-      "codeGeneratorName" -> (codegen / name).value,
+      "codeGeneratorName" -> (codegen.jvm(Scala212) / name).value,
       "codeGeneratorFullName" -> codegenFullName,
-      "runtimeName" -> (runtime / name).value
+      "runtimeName" -> (runtime.jvm(Scala212) / name).value
     ),
     libraryDependencies += scalaPbCompiler,
     addSbtPlugin(sbtProtoc)
   )
 
-lazy val runtime = project
+lazy val runtime = (projectMatrix in file("runtime"))
+  .defaultAxes(axesDefault: _*)
   .settings(
     name := "fs2-grpc-runtime",
+    crossScalaVersions := List(Scala212, Scala213),
     libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
     Test / parallelExecution := false
   )
+  .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
 
-lazy val protocGen = protocGenProject("protoc-gen-fs2-grpc", codegen)
+lazy val codeGenJVM212 = codegen.jvm(Scala212)
+lazy val protocGen = protocGenProject("protoc-gen-fs2-grpc", codeGenJVM212)
   .settings(
     Compile / mainClass := Some(codegenFullName),
     githubWorkflowArtifactUpload := false,
@@ -105,12 +115,13 @@ lazy val protocGen = protocGenProject("protoc-gen-fs2-grpc", codegen)
     mimaPreviousArtifacts := Set()
   )
 
-lazy val e2e = project
-  .in(file("e2e"))
+lazy val e2e = (projectMatrix in file("e2e"))
   .dependsOn(runtime)
+  .defaultAxes(axesDefault: _*)
   .enablePlugins(LocalCodeGenPlugin, BuildInfoPlugin, NoPublishPlugin)
   .settings(
-    codeGenClasspath := (codegen / Compile / fullClasspath).value,
+    crossScalaVersions := Seq(Scala212, Scala213),
+    codeGenClasspath := (codeGenJVM212 / Compile / fullClasspath).value,
     libraryDependencies := Nil,
     libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),
     Compile / PB.targets := Seq(
@@ -121,3 +132,4 @@ lazy val e2e = project
     buildInfoKeys := Seq[BuildInfoKey]("sourceManaged" -> (Compile / sourceManaged).value / "fs2-grpc"),
     githubWorkflowArtifactUpload := false
   )
+  .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))

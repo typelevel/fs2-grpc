@@ -60,9 +60,11 @@ lazy val codegen = (projectMatrix in file("codegen"))
   .settings(
     name := "fs2-grpc-codegen",
     libraryDependencies += scalaPbCompiler,
-    tlMimaPreviousVersions := {
-      if (scalaVersion == Scala212) tlMimaPreviousVersions.value else Set() // Temporary
-    }
+    tlVersionIntroduced := Map(
+      "2.12" -> "2.4.0",
+      "2.13" -> "2.5.0-RC3",
+      "3" -> "2.5.0-RC3"
+    )
   )
   .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
 

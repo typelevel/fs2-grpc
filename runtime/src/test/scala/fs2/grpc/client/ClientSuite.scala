@@ -219,7 +219,7 @@ class ClientSuite extends Fs2GrpcSuite {
     tc.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 3)
+    assertEquals(dummy.requested, 2)
 
   }
 
@@ -245,7 +245,7 @@ class ClientSuite extends Fs2GrpcSuite {
 
     assertEquals(result.value, Some(Success(List(1, 2))))
     assertEquals(dummy.messagesSent.size, 1)
-    assertEquals(dummy.requested, 2)
+    assertEquals(dummy.requested, 1)
   }
 
   runTest0("stream to streamingToStreaming") { (tc, io, d) =>
@@ -273,7 +273,7 @@ class ClientSuite extends Fs2GrpcSuite {
     tc.tick()
     assertEquals(result.value, Some(Success(List(1, 2, 3))))
     assertEquals(dummy.messagesSent.size, 5)
-    assertEquals(dummy.requested, 3)
+    assertEquals(dummy.requested, 2)
 
   }
 
@@ -371,7 +371,7 @@ class ClientSuite extends Fs2GrpcSuite {
       Status.INTERNAL
     )
     assertEquals(dummy.messagesSent.size, 5)
-    assertEquals(dummy.requested, 3)
+    assertEquals(dummy.requested, 2)
 
   }
 

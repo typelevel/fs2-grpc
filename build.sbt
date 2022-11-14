@@ -61,9 +61,9 @@ lazy val codegen = (projectMatrix in file("codegen"))
     name := "fs2-grpc-codegen",
     libraryDependencies += scalaPbCompiler,
     tlVersionIntroduced := Map(
-      "2.12" -> "2.4.0",
-      "2.13" -> "2.5.0",
-      "3" -> "2.5.0"
+      "2.12" -> "2.5.1",
+      "2.13" -> "2.5.1",
+      "3" -> "2.5.1"
     )
   )
   .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
@@ -99,9 +99,7 @@ lazy val runtime = (projectMatrix in file("runtime"))
   .settings(
     name := "fs2-grpc-runtime",
     crossScalaVersions := List(Scala212, Scala213, Scala3),
-    // TODO: Remove after published for Scala3
-    mimaFailOnNoPrevious := false,
-    mimaPreviousArtifacts := Set(),
+    tlVersionIntroduced := Map("3" -> "2.5.1"),
     libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
     Test / parallelExecution := false
   )

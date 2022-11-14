@@ -98,7 +98,7 @@ lazy val runtime = (projectMatrix in file("runtime"))
   .defaultAxes(axesDefault: _*)
   .settings(
     name := "fs2-grpc-runtime",
-    crossScalaVersions := List(Scala212, Scala213),
+    crossScalaVersions := List(Scala212, Scala213, Scala3),
     libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
     Test / parallelExecution := false
   )
@@ -122,7 +122,7 @@ lazy val e2e = (projectMatrix in file("e2e"))
   .defaultAxes(axesDefault: _*)
   .enablePlugins(LocalCodeGenPlugin, BuildInfoPlugin, NoPublishPlugin)
   .settings(
-    crossScalaVersions := Seq(Scala212, Scala213),
+    crossScalaVersions := Seq(Scala212, Scala213, Scala3),
     codeGenClasspath := (codeGenJVM212 / Compile / fullClasspath).value,
     libraryDependencies := Nil,
     libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),

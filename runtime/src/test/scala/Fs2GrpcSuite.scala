@@ -63,7 +63,7 @@ class Fs2GrpcSuite extends CatsEffectSuite with CatsEffectFunFixtures {
   protected def runTest0(name: String)(body: (TestContext, IORuntime, Dispatcher[IO]) => Unit): Unit = {
     test(name) {
       val (ec: TestContext, r: IORuntime) = createDeterministicRuntime
-      val dispatcherF = Dispatcher[IO].allocated.unsafeToFuture()(r)
+      val dispatcherF = Dispatcher.parallel[IO].allocated.unsafeToFuture()(r)
       ec.tick()
       val (dispatcher, shutdown) = dispatcherF.value.get.get
       val fakeDispatcher: Dispatcher[IO] = new Dispatcher[IO] {

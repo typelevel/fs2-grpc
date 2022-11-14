@@ -62,8 +62,8 @@ lazy val codegen = (projectMatrix in file("codegen"))
     libraryDependencies += scalaPbCompiler,
     tlVersionIntroduced := Map(
       "2.12" -> "2.4.0",
-      "2.13" -> "2.5.0-RC3",
-      "3" -> "2.5.0-RC3"
+      "2.13" -> "2.5.0",
+      "3" -> "2.5.0"
     )
   )
   .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
@@ -98,7 +98,10 @@ lazy val runtime = (projectMatrix in file("runtime"))
   .defaultAxes(axesDefault: _*)
   .settings(
     name := "fs2-grpc-runtime",
-    crossScalaVersions := List(Scala212, Scala213),
+    crossScalaVersions := List(Scala212, Scala213, Scala3),
+    // TODO: Remove after published for Scala3
+    mimaFailOnNoPrevious := false,
+    mimaPreviousArtifacts := Set(),
     libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
     Test / parallelExecution := false
   )
@@ -122,7 +125,7 @@ lazy val e2e = (projectMatrix in file("e2e"))
   .defaultAxes(axesDefault: _*)
   .enablePlugins(LocalCodeGenPlugin, BuildInfoPlugin, NoPublishPlugin)
   .settings(
-    crossScalaVersions := Seq(Scala212, Scala213),
+    crossScalaVersions := Seq(Scala212, Scala213, Scala3),
     codeGenClasspath := (codeGenJVM212 / Compile / fullClasspath).value,
     libraryDependencies := Nil,
     libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),

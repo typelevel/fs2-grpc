@@ -70,7 +70,6 @@ The generated code provides a method `stubResource[F]`, for any `F` which has a 
 Moreover, the generated code provides method overloads that take `ClientOptions` used for configuring calls.
 
 ```scala
-
 def runProgram(stub: MyFs2Grpc[IO]): IO[Unit] = ???
 
 val run: IO[Unit] = managedChannelResource

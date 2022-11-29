@@ -77,6 +77,7 @@ lazy val plugin = project
     name := "sbt-fs2-grpc",
     scalaVersion := Scala212,
     crossScalaVersions := List(Scala212),
+    tlVersionIntroduced := Map("2.12" -> "2.5.3"),
     sbtPlugin := true,
     buildInfoPackage := "fs2.grpc.buildinfo",
     buildInfoKeys := Seq[BuildInfoKey](

@@ -33,7 +33,7 @@ private[grpc] trait StreamOutput[F[_], T] {
 
   def onReadySync(dispatcher: Dispatcher[F]): SyncIO[Unit] = SyncIO.delay(dispatcher.unsafeRunSync(onReady))
 
-  def writeStream(s: Stream[F, T]): Stream[F, Unit]
+  def writeStream(s: Stream[F, T]): Stream[F, Nothing]
 }
 
 private[grpc] object StreamOutput {
@@ -70,7 +70,7 @@ private[grpc] class StreamOutputImpl[F[_], T](
     extends StreamOutput[F, T] {
   override def onReady: F[Unit] = readyCountRef.update(_ + 1L)
 
-  override def writeStream(s: Stream[F, T]): Stream[F, Unit] = s.evalMap(sendWhenReady)
+  override def writeStream(s: Stream[F, T]): Stream[F, Nothing] = s.foreach(sendWhenReady)
 
   private def sendWhenReady(msg: T): F[Unit] = {
     val send = sendMessage(msg)

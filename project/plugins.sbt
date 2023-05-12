@@ -1,4 +1,4 @@
-addSbtPlugin("org.typelevel" % "sbt-typelevel" % "0.4.20")
+addSbtPlugin("org.typelevel" % "sbt-typelevel" % "0.4.21")
 
 addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.11.0")
 addSbtPlugin("com.eed3si9n" % "sbt-projectmatrix" % "0.9.0")

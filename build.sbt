@@ -2,7 +2,7 @@ import com.typesafe.tools.mima.core._
 import com.typesafe.tools.mima.core.ProblemFilters._
 import Dependencies._
 
-lazy val Scala3 = "3.2.2"
+lazy val Scala3 = "3.3.0"
 lazy val Scala213 = "2.13.10"
 lazy val Scala212 = "2.12.17"
 

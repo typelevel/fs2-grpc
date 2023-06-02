@@ -31,9 +31,6 @@ inThisBuild(
     githubWorkflowJavaVersions := Seq(
       JavaSpec.temurin("8"),
       JavaSpec.temurin("17")
-    ),
-    githubWorkflowPublish := Seq(
-      WorkflowStep.Sbt(List("clean", "tlCiRelease"), name = Some("Publish"))
     )
   ) ++ List(
     mimaBinaryIssueFilters ++= Seq(

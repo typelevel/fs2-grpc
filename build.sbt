@@ -9,9 +9,6 @@ lazy val Scala212 = "2.12.17"
 lazy val axesDefault =
   Seq(VirtualAxis.scalaABIVersion(Scala213), VirtualAxis.jvm)
 
-lazy val Scala3Flags =
-  Seq("-language:implicitConversions", "-Ykind-projector", "-source:3.0-migration")
-
 Global / lintUnusedKeysOnLoad := false
 
 def dev(ghUser: String, name: String, email: String): Developer =
@@ -104,10 +101,10 @@ lazy val runtime = (projectMatrix in file("runtime"))
     libraryDependencies ++= List(fs2, catsEffect, grpcApi) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
     Test / parallelExecution := false,
     scalacOptions ++= {
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) => Scala3Flags
-        case _ => Seq.empty
-      }
+      if (tlIsScala3.value)
+        Seq("-language:implicitConversions", "-Ykind-projector", "-source:3.0-migration")
+      else
+        Seq.empty
     }
   )
   .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
@@ -141,10 +138,10 @@ lazy val e2e = (projectMatrix in file("e2e"))
     buildInfoKeys := Seq[BuildInfoKey]("sourceManaged" -> (Compile / sourceManaged).value / "fs2-grpc"),
     githubWorkflowArtifactUpload := false,
     scalacOptions ++= {
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) => Scala3Flags
-        case _ => Seq.empty
-      }
+      if (tlIsScala3.value)
+        Seq("-language:implicitConversions", "-Ykind-projector", "-source:3.0-migration")
+      else
+        Seq.empty
     }
   )
   .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))

@@ -118,12 +118,12 @@ object Fs2GrpcPlugin extends AutoPlugin {
     inConfig(config)(
       List(
         fs2GrpcServiceSuffix := "Fs2Grpc",
-        fs2GrpcOutputPath := sourceManaged.value / "fs2-grpc",
-        scalapbProtobufDirectory := sourceManaged.value / "scalapb",
+        fs2GrpcOutputPath := (config / sourceManaged).value / "fs2-grpc",
+        scalapbProtobufDirectory := (config / sourceManaged).value / "scalapb",
         scalapbCodeGenerators := {
           Target(
             convertOptionsToScalapbGen(scalapbCodeGeneratorOptions.value.toSet),
-            sourceManaged.value / "scalapb"
+            (config / sourceManaged).value / "scalapb"
           ) ::
             Option(
               Target(

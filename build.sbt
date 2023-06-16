@@ -78,6 +78,8 @@ lazy val plugin = project
     scalaVersion := Scala212,
     tlVersionIntroduced := Map("2.12" -> "2.5.3"),
     sbtPlugin := true,
+    mimaFailOnNoPrevious := false,
+    mimaPreviousArtifacts := Set(),
     buildInfoPackage := "fs2.grpc.buildinfo",
     buildInfoKeys := Seq[BuildInfoKey](
       name,

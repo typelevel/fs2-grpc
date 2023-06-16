@@ -100,10 +100,37 @@ object Fs2GrpcPlugin extends AutoPlugin {
 
   private def codegenScalaBinaryVersion = CrossVersion.binaryScalaVersion(BuildInfo.scalaVersion)
 
-  override def projectSettings: Seq[Def.Setting[_]] = defaultSettings ++ configSettings(Compile) ++ configSettings(Test)
-
-  private def defaultSettings =
+  override def projectSettings: Seq[Def.Setting[_]] =
     List(
+      fs2GrpcServiceSuffix := "Fs2Grpc",
+      fs2GrpcOutputPath := (Compile / sourceManaged).value / "fs2-grpc",
+      scalapbProtobufDirectory := (Compile / sourceManaged).value / "scalapb",
+      scalapbCodeGenerators := {
+        Target(
+          convertOptionsToScalapbGen(scalapbCodeGeneratorOptions.value.toSet),
+          (Compile / sourceManaged).value / "scalapb"
+        ) ::
+          Option(
+            Target(
+              (
+                SandboxedJvmGenerator.forModule(
+                  "scala-fs2-grpc",
+                  Artifact(
+                    BuildInfo.organization,
+                    s"${BuildInfo.codeGeneratorName}_$codegenScalaBinaryVersion",
+                    BuildInfo.version
+                  ),
+                  BuildInfo.codeGeneratorFullName + "$",
+                  Nil
+                ),
+                scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString) :+
+                  s"serviceSuffix=${fs2GrpcServiceSuffix.value}"
+              ),
+              fs2GrpcOutputPath.value
+            )
+          ).filter(_ => scalapbCodeGeneratorOptions.value.contains(CodeGeneratorOption.Fs2Grpc)).toList
+      },
+      scalapbCodeGeneratorOptions := Seq(CodeGeneratorOption.Grpc, CodeGeneratorOption.Fs2Grpc),
       libraryDependencies ++= List(
         "io.grpc" % "grpc-core" % BuildInfo.grpcVersion,
         "io.grpc" % "grpc-stub" % BuildInfo.grpcVersion,
@@ -111,41 +138,6 @@ object Fs2GrpcPlugin extends AutoPlugin {
         BuildInfo.organization %% BuildInfo.runtimeName % BuildInfo.version,
         "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
         "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
-      )
-    )
-
-  def configSettings(config: Configuration): Seq[Setting[_]] =
-    inConfig(config)(
-      List(
-        fs2GrpcServiceSuffix := "Fs2Grpc",
-        fs2GrpcOutputPath := (config / sourceManaged).value / "fs2-grpc",
-        scalapbProtobufDirectory := (config / sourceManaged).value / "scalapb",
-        scalapbCodeGenerators := {
-          Target(
-            convertOptionsToScalapbGen(scalapbCodeGeneratorOptions.value.toSet),
-            (config / sourceManaged).value / "scalapb"
-          ) ::
-            Option(
-              Target(
-                (
-                  SandboxedJvmGenerator.forModule(
-                    "scala-fs2-grpc",
-                    Artifact(
-                      BuildInfo.organization,
-                      s"${BuildInfo.codeGeneratorName}_$codegenScalaBinaryVersion",
-                      BuildInfo.version
-                    ),
-                    BuildInfo.codeGeneratorFullName + "$",
-                    Nil
-                  ),
-                  scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString) :+
-                    s"serviceSuffix=${fs2GrpcServiceSuffix.value}"
-                ),
-                fs2GrpcOutputPath.value
-              )
-            ).filter(_ => scalapbCodeGeneratorOptions.value.contains(CodeGeneratorOption.Fs2Grpc)).toList
-        },
-        scalapbCodeGeneratorOptions := Seq(CodeGeneratorOption.Grpc, CodeGeneratorOption.Fs2Grpc)
       )
     )
 }

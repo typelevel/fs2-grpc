@@ -143,8 +143,9 @@ lazy val e2e = (projectMatrix in file("e2e"))
     buildInfoKeys := Seq[BuildInfoKey]("sourceManaged" -> (Compile / sourceManaged).value / "fs2-grpc"),
     githubWorkflowArtifactUpload := false,
     scalacOptions := {
-      if (tlIsScala3.value) { scalacOptions.value.filterNot(_ == "-Ykind-projector:underscores") }
-      else scalacOptions.value
+      if (tlIsScala3.value) {
+        scalacOptions.value.filterNot(o => o == "-Ykind-projector:underscores" || o == "-Wvalue-discard")
+      } else scalacOptions.value
     },
     scalacOptions ++= {
       if (tlIsScala3.value) { Seq("-language:implicitConversions", "-Ykind-projector", "-source:3.0-migration") }

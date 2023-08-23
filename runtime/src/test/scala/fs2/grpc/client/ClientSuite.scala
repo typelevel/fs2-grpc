@@ -28,7 +28,6 @@ import scala.concurrent.TimeoutException
 import scala.util.Success
 import cats.effect._
 import cats.effect.std.Dispatcher
-import fs2._
 import io.grpc._
 
 class ClientSuite extends Fs2GrpcSuite {

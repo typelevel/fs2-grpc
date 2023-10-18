@@ -64,6 +64,12 @@ object Fs2GrpcPlugin extends AutoPlugin {
       case object AsciiFormatToString extends CodeGeneratorOption {
         override def toString: String = "ascii_format_to_string"
       }
+      case object NoLenses extends CodeGeneratorOption {
+        override def toString: String = "no_lenses"
+      }
+      case object Scala3Sources extends CodeGeneratorOption {
+        override def toString: String = "scala3_sources"
+      }
     }
 
     val scalapbCodeGeneratorOptions =
@@ -94,7 +100,9 @@ object Fs2GrpcPlugin extends AutoPlugin {
       javaConversions = options(CodeGeneratorOption.JavaConversions),
       grpc = options(CodeGeneratorOption.Grpc),
       singleLineToProtoString = options(CodeGeneratorOption.SingleLineToProtoString),
-      asciiFormatToString = options(CodeGeneratorOption.AsciiFormatToString)
+      asciiFormatToString = options(CodeGeneratorOption.AsciiFormatToString),
+      lenses = !options(CodeGeneratorOption.NoLenses),
+      scala3Sources = options(CodeGeneratorOption.Scala3Sources)
     )
   }
 

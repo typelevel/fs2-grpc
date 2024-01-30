@@ -138,7 +138,7 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
 
   def printService(printer: FunctionalPrinter): FunctionalPrinter = {
     printer
-      .add(s"package $servicePkgName", "", "import _root_.cats.syntax.all._", "")
+      .add(s"package $servicePkgName", "", s"import _root_.cats.syntax.all.${service.getFile.V.WildcardImport}", "")
       .call(serviceTrait)
       .newline
       .call(serviceObject)

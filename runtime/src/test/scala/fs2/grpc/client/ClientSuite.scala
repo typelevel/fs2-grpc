@@ -47,10 +47,11 @@ class ClientSuite extends Fs2GrpcSuite {
     assertEquals(result.value, None)
 
     dummy.listener.get.onClose(Status.OK, new Metadata())
+    // TODO
 
     // Check that call completes after status
     tc.tick()
-    assertEquals(result.value, Some(Success(5)))
+    assertEquals(result.value.map(_.map(_._1)), Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 1)
     assertEquals(dummy.requested, 2)
 
@@ -139,7 +140,7 @@ class ClientSuite extends Fs2GrpcSuite {
 
     // Check that call completes after status
     tc.tick()
-    assertEquals(result.value, Some(Success(5)))
+    assertEquals(result.value.map(_.map(_._1)), Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 3)
     assertEquals(dummy.requested, 2)
 
@@ -192,7 +193,7 @@ class ClientSuite extends Fs2GrpcSuite {
 
     // Check that call completes after status
     tc.tick()
-    assertEquals(result.value, Some(Success(5)))
+    assertEquals(result.value.map(_.map(_._1)), Some(Success(5)))
     assertEquals(dummy.messagesSent.size, 0)
     assertEquals(dummy.requested, 2)
 

@@ -40,8 +40,8 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     val ctx = s"ctx: $Ctx"
 
     s"def ${method.name}" + (method.streamType match {
-      case StreamType.Unary => s"(request: $scalaInType, $ctx): F[$scalaOutType]"
-      case StreamType.ClientStreaming => s"(request: $Stream[F, $scalaInType], $ctx): F[$scalaOutType]"
+      case StreamType.Unary => s"(request: $scalaInType, $ctx): F[($scalaOutType, $Metadata)]"
+      case StreamType.ClientStreaming => s"(request: $Stream[F, $scalaInType], $ctx): F[($scalaOutType, $Metadata)]"
       case StreamType.ServerStreaming => s"(request: $scalaInType, $ctx): $Stream[F, $scalaOutType]"
       case StreamType.Bidirectional => s"(request: $Stream[F, $scalaInType], $ctx): $Stream[F, $scalaOutType]"
     })

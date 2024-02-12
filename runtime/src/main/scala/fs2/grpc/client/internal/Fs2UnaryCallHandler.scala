@@ -38,28 +38,28 @@ private[client] object Fs2UnaryCallHandler {
 
   object ReceiveState {
     def init[F[_]: Sync, R](
-        callback: Either[Throwable, R] => Unit,
+        callback: Either[Throwable, (R, Metadata)] => Unit,
         pf: PartialFunction[StatusRuntimeException, Exception]
     ): F[Ref[SyncIO, ReceiveState[R]]] =
       Ref.in(new PendingMessage[R]({
-        case r: Right[Throwable, R] => callback(r)
+        case r: Right[Throwable, (R, Metadata)] => callback(r)
         case Left(e: StatusRuntimeException) => callback(Left(pf.lift(e).getOrElse(e)))
-        case l: Left[Throwable, R] => callback(l)
+        case l: Left[Throwable, (R, Metadata)] => callback(l)
       }))
   }
 
-  class PendingMessage[R](callback: Either[Throwable, R] => Unit) extends ReceiveState[R] {
+  class PendingMessage[R](callback: Either[Throwable, (R, Metadata)] => Unit) extends ReceiveState[R] {
     def receive(message: R): PendingHalfClose[R] = new PendingHalfClose(callback, message)
 
     def sendError(error: Throwable): SyncIO[ReceiveState[R]] =
       SyncIO(callback(Left(error))).as(new Done[R])
   }
 
-  class PendingHalfClose[R](callback: Either[Throwable, R] => Unit, message: R) extends ReceiveState[R] {
+  class PendingHalfClose[R](callback: Either[Throwable, (R, Metadata)] => Unit, message: R) extends ReceiveState[R] {
     def sendError(error: Throwable): SyncIO[ReceiveState[R]] =
       SyncIO(callback(Left(error))).as(new Done[R])
 
-    def done: SyncIO[ReceiveState[R]] = SyncIO(callback(Right(message))).as(new Done[R])
+    def done(trailers: Metadata): SyncIO[ReceiveState[R]] = SyncIO(callback(Right((message, trailers)))).as(new Done[R])
   }
 
   class Done[R] extends ReceiveState[R]
@@ -69,6 +69,7 @@ private[client] object Fs2UnaryCallHandler {
       signalReadiness: SyncIO[Unit]
   ): ClientCall.Listener[Response] =
     new ClientCall.Listener[Response] {
+
       override def onMessage(message: Response): Unit =
         state.get
           .flatMap {
@@ -90,7 +91,7 @@ private[client] object Fs2UnaryCallHandler {
         if (status.isOk) {
           state.get.flatMap {
             case expected: PendingHalfClose[Response] =>
-              expected.done.flatMap(state.set)
+              expected.done(trailers).flatMap(state.set)
             case current: PendingMessage[Response] =>
               current
                 .sendError(
@@ -120,7 +121,7 @@ private[client] object Fs2UnaryCallHandler {
       options: ClientOptions,
       message: Request,
       headers: Metadata
-  )(implicit F: Async[F]): F[Response] = F.async[Response] { cb =>
+  )(implicit F: Async[F]): F[(Response, Metadata)] = F.async[(Response, Metadata)] { cb =>
     ReceiveState.init(cb, options.errorAdapter).map { state =>
       call.start(mkListener[Response](state, SyncIO.unit), headers)
       // Initially ask for two responses from flow-control so that if a misbehaving server
@@ -139,8 +140,8 @@ private[client] object Fs2UnaryCallHandler {
       messages: Stream[F, Request],
       output: StreamOutput[F, Request],
       headers: Metadata
-  )(implicit F: Async[F]): F[Response] = F.async[Response] { cb =>
-    ReceiveState.init(cb, options.errorAdapter).flatMap { state =>
+  )(implicit F: Async[F]): F[(Response, Metadata)] = F.async[(Response, Metadata)] { cb =>
+    ReceiveState.init[F, Response](cb, options.errorAdapter).flatMap { state =>
       call.start(mkListener[Response](state, output.onReadySync(dispatcher)), headers)
       // Initially ask for two responses from flow-control so that if a misbehaving server
       // sends more than one responses, we can catch it and fail it in the listener.

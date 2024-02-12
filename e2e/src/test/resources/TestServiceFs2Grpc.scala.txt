@@ -3,8 +3,8 @@ package hello.world
 import _root_.cats.syntax.all._
 
 trait TestServiceFs2Grpc[F[_], A] {
-  def noStreaming(request: hello.world.TestMessage, ctx: A): F[hello.world.TestMessage]
-  def clientStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): F[hello.world.TestMessage]
+  def noStreaming(request: hello.world.TestMessage, ctx: A): F[(hello.world.TestMessage, _root_.io.grpc.Metadata)]
+  def clientStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): F[(hello.world.TestMessage, _root_.io.grpc.Metadata)]
   def serverStreaming(request: hello.world.TestMessage, ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage]
   def bothStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage]
 }
@@ -12,12 +12,12 @@ trait TestServiceFs2Grpc[F[_], A] {
 object TestServiceFs2Grpc extends _root_.fs2.grpc.GeneratedCompanion[TestServiceFs2Grpc] {
   
   def mkClient[F[_]: _root_.cats.effect.Async, A](dispatcher: _root_.cats.effect.std.Dispatcher[F], channel: _root_.io.grpc.Channel, mkMetadata: A => F[_root_.io.grpc.Metadata], clientOptions: _root_.fs2.grpc.client.ClientOptions): TestServiceFs2Grpc[F, A] = new TestServiceFs2Grpc[F, A] {
-    def noStreaming(request: hello.world.TestMessage, ctx: A): F[hello.world.TestMessage] = {
+    def noStreaming(request: hello.world.TestMessage, ctx: A): F[(hello.world.TestMessage, _root_.io.grpc.Metadata)] = {
       mkMetadata(ctx).flatMap { m =>
         _root_.fs2.grpc.client.Fs2ClientCall[F](channel, hello.world.TestServiceGrpc.METHOD_NO_STREAMING, dispatcher, clientOptions).flatMap(_.unaryToUnaryCall(request, m))
       }
     }
-    def clientStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): F[hello.world.TestMessage] = {
+    def clientStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): F[(hello.world.TestMessage, _root_.io.grpc.Metadata)] = {
       mkMetadata(ctx).flatMap { m =>
         _root_.fs2.grpc.client.Fs2ClientCall[F](channel, hello.world.TestServiceGrpc.METHOD_CLIENT_STREAMING, dispatcher, clientOptions).flatMap(_.streamingToUnaryCall(request, m))
       }

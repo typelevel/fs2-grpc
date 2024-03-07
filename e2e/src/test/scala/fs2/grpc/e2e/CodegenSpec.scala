@@ -42,8 +42,21 @@ class Fs2CodeGeneratorSpec extends munit.FunSuite {
 
   }
 
+  test("code generator outputs correct service file for trailers") {
+
+    val testFileName = "TestServiceFs2GrpcTrailers.scala"
+    val reference = Source.fromResource(s"${testFileName}.txt").getLines().mkString("\n")
+    val generated = Source.fromFile(new File(sourcesGenerated, testFileName)).getLines().mkString("\n")
+
+    assertEquals(generated, reference)
+
+  }
+
   test("implicit of companion resolves") {
     implicitly[GeneratedCompanion[TestServiceFs2Grpc]]
   }
 
+  test("implicit of companion resolves trailers") {
+    implicitly[GeneratedCompanion[TestServiceFs2GrpcTrailers]]
+  }
 }

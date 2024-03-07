@@ -32,6 +32,7 @@ import munit._
 
 class Fs2GrpcSuite extends CatsEffectSuite with CatsEffectFunFixtures {
 
+
   private val parasiticExecutionContext = new ExecutionContext {
     def execute(runnable: Runnable): Unit = runnable.run()
     def reportFailure(cause: Throwable): Unit = cause.printStackTrace()

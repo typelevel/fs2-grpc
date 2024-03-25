@@ -33,6 +33,11 @@ trait GeneratedCompanion[Service[*[_], _]] {
 
   implicit final def serviceCompanion: GeneratedCompanion[Service] = this
 
+
+///=== ServiceDescriptor ===============================================================================================
+
+  def serviceDescriptor: ServiceDescriptor
+
 ///=== Client ==========================================================================================================
 
   def mkClient[F[_]: Async, A](

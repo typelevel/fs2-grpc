@@ -24,8 +24,8 @@ package grpc
 package syntax
 
 import java.util.concurrent.TimeUnit
-import scala.concurrent._
 import cats.effect._
+import cats.syntax.all._
 import io.grpc.{Server, ServerBuilder}
 
 trait ServerBuilderSyntax {
@@ -45,13 +45,11 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     */
   def resource[F[_]](implicit F: Sync[F]): Resource[F, Server] =
     resourceWithShutdown { server =>
-      F.delay {
-        server.shutdown()
-        if (!blocking(server.awaitTermination(30, TimeUnit.SECONDS))) {
-          server.shutdownNow()
-          ()
-        }
-      }
+      for {
+        _ <- F.delay(server.shutdown())
+        terminated <- F.interruptible(server.awaitTermination(30, TimeUnit.SECONDS))
+        _ <- F.unlessA(terminated)(F.delay(server.shutdownNow()))
+      } yield (())
     }
 
   /** Builds a `Server` into a resource. The server is shut down when the resource is released.

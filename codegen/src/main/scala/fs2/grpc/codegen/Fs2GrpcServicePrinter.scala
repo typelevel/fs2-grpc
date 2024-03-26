@@ -47,18 +47,23 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
     })
   }
 
-  private[this] def handleMethod(method: MethodDescriptor) = {
+  private[this] def methodName(method: MethodDescriptor) =
     method.streamType match {
-      case StreamType.Unary => "unaryToUnaryCall"
-      case StreamType.ClientStreaming => "streamingToUnaryCall"
-      case StreamType.ServerStreaming => "unaryToStreamingCall"
-      case StreamType.Bidirectional => "streamingToStreamingCall"
+      case StreamType.Unary => "unaryToUnary"
+      case StreamType.ClientStreaming => "streamingToUnary"
+      case StreamType.ServerStreaming => "unaryToStreaming"
+      case StreamType.Bidirectional => "streamingToStreaming"
     }
-  }
+
+  private[this] def handleMethod(method: MethodDescriptor) =
+    methodName(method) + "Call"
+
+  private[this] def visitMethod(method: MethodDescriptor) =
+    "visit" + methodName(method).capitalize
 
   private[this] def createClientCall(method: MethodDescriptor) = {
     val basicClientCall =
-      s"$Fs2ClientCall[F](channel, ${method.grpcDescriptor.fullName}, dispatcher, clientOptions)"
+      s"$Fs2ClientCall[G](channel, ${method.grpcDescriptor.fullName}, dispatcher, clientOptions)"
     if (method.isServerStreaming)
       s"$Stream.eval($basicClientCall)"
     else
@@ -66,29 +71,43 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
   }
 
   private[this] def serviceMethodImplementation(method: MethodDescriptor): PrinterEndo = { p =>
-    val mkMetadata = if (method.isServerStreaming) s"$Stream.eval(mkMetadata(ctx))" else "mkMetadata(ctx)"
+    val inType = method.inputType.scalaType
+    val outType = method.outputType.scalaType
+    val descriptor = method.grpcDescriptor.fullName
 
-    p.add(serviceMethodSignature(method) + " = {")
-      .indent
-      .add(s"$mkMetadata.flatMap { m =>")
-      .indent
-      .add(s"${createClientCall(method)}.flatMap(_.${handleMethod(method)}(request, m))")
-      .outdent
-      .add("}")
-      .outdent
-      .add("}")
+    p
+      .add(serviceMethodSignature(method) + " =")
+      .indented {
+        _.addStringMargin(
+          s"""|clientAspect.${visitMethod(method)}[$inType, $outType](
+              |  ${ClientCallContext}(ctx, $descriptor),
+              |  request,
+              |  (req, m) => ${createClientCall(method)}.flatMap(_.${handleMethod(method)}(req, m))
+              |)""".stripMargin
+        )
+      }
   }
 
   private[this] def serviceBindingImplementation(method: MethodDescriptor): PrinterEndo = { p =>
     val inType = method.inputType.scalaType
     val outType = method.outputType.scalaType
     val descriptor = method.grpcDescriptor.fullName
-    val handler = s"$Fs2ServerCallHandler[F](dispatcher, serverOptions).${handleMethod(method)}[$inType, $outType]"
+    val handler = s"$Fs2ServerCallHandler[G](dispatcher, serverOptions).${handleMethod(method)}[$inType, $outType]"
 
     val serviceCall = s"serviceImpl.${method.name}"
-    val eval = if (method.isServerStreaming) s"$Stream.eval(mkCtx(m))" else "mkCtx(m)"
 
-    p.add(s".addMethod($descriptor, $handler((r, m) => $eval.flatMap($serviceCall(r, _))))")
+    p.addStringMargin(
+      s"""|.addMethod(
+          |  $descriptor,
+          |  $handler{ (r, m) => 
+          |    serviceAspect.${visitMethod(method)}[$inType, $outType](
+          |      ${ServerCallContext}(m, $descriptor),
+          |      r,
+          |      (r, m) => $serviceCall(r, m)
+          |    )
+          |  }
+          |)"""
+    )
   }
 
   private[this] def serviceMethods: PrinterEndo = _.seq(service.methods.map(serviceMethodSignature))
@@ -116,8 +135,13 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
       .add("}")
 
   private[this] def serviceClient: PrinterEndo = {
-    _.add(
-      s"def mkClient[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], channel: $Channel, mkMetadata: $Ctx => F[$Metadata], clientOptions: $ClientOptions): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"
+    _.addStringMargin(
+      s"""|def mkClientFull[F[_], G[_]: $Async, $Ctx](
+          |  dispatcher: $Dispatcher[G],
+          |  channel: $Channel,
+          |  clientAspect: ${ClientAspect}[F, G, $Ctx],
+          |  clientOptions: $ClientOptions
+          |): $serviceNameFs2[F, $Ctx] = new $serviceNameFs2[F, $Ctx] {"""
     ).indent
       .call(serviceMethodImplementations)
       .outdent
@@ -125,8 +149,13 @@ class Fs2GrpcServicePrinter(service: ServiceDescriptor, serviceSuffix: String, d
   }
 
   private[this] def serviceBinding: PrinterEndo = {
-    _.add(
-      s"protected def serviceBinding[F[_]: $Async, $Ctx](dispatcher: $Dispatcher[F], serviceImpl: $serviceNameFs2[F, $Ctx], mkCtx: $Metadata => F[$Ctx], serverOptions: $ServerOptions): $ServerServiceDefinition = {"
+    _.addStringMargin(
+      s"""|protected def serviceBindingFull[F[_], G[_]: $Async, $Ctx](
+          |  dispatcher: $Dispatcher[G],
+          |  serviceImpl: $serviceNameFs2[F, $Ctx],
+          |  serviceAspect: ${ServiceAspect}[F, G, $Ctx],
+          |  serverOptions: $ServerOptions
+          |) = {"""
     ).indent
       .add(s"$ServerServiceDefinition")
       .call(serviceBindingImplementations)
@@ -152,6 +181,8 @@ object Fs2GrpcServicePrinter {
     private val effPkg = "_root_.cats.effect"
     private val fs2Pkg = "_root_.fs2"
     private val fs2grpcPkg = "_root_.fs2.grpc"
+    private val fs2grpcServerPkg = "_root_.fs2.grpc.server"
+    private val fs2grpcClientPkg = "_root_.fs2.grpc.client"
     private val grpcPkg = "_root_.io.grpc"
 
     // /
@@ -173,6 +204,10 @@ object Fs2GrpcServicePrinter {
     val Channel = s"$grpcPkg.Channel"
     val Metadata = s"$grpcPkg.Metadata"
 
+    val ServiceAspect = s"${fs2grpcServerPkg}.ServiceAspect"
+    val ServerCallContext = s"${fs2grpcServerPkg}.ServerCallContext"
+    val ClientAspect = s"${fs2grpcClientPkg}.ClientAspect"
+    val ClientCallContext = s"${fs2grpcClientPkg}.ClientCallContext"
   }
 
 }

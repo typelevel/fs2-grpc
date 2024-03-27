@@ -21,32 +21,55 @@
 
 package fs2.grpc.codegen
 
-import com.google.protobuf.Descriptors.FileDescriptor
+import com.google.protobuf.Descriptors.{FileDescriptor, ServiceDescriptor}
 import com.google.protobuf.ExtensionRegistry
 import com.google.protobuf.compiler.PluginProtos
 import protocgen.{CodeGenApp, CodeGenRequest, CodeGenResponse}
 import scalapb.compiler.{DescriptorImplicits, FunctionalPrinter, GeneratorParams}
 import scalapb.options.Scalapb
-import scala.jdk.CollectionConverters._
+
+import scala.jdk.CollectionConverters.*
 
 final case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
 
 object Fs2CodeGenerator extends CodeGenApp {
+
+  private def generateServiceFile(
+      file: FileDescriptor,
+      service: ServiceDescriptor,
+      serviceSuffix: String,
+      di: DescriptorImplicits,
+      p: ServiceDescriptor => Fs2ServicePrinter
+  ): PluginProtos.CodeGeneratorResponse.File = {
+    import di.{ExtendedServiceDescriptor, ExtendedFileDescriptor}
+
+    val code = p(service).printService(FunctionalPrinter()).result()
+    val b = PluginProtos.CodeGeneratorResponse.File.newBuilder()
+    b.setName(file.scalaDirectory + "/" + service.name + s"$serviceSuffix.scala")
+    b.setContent(code)
+    b.build
+  }
 
   def generateServiceFiles(
       file: FileDescriptor,
       fs2params: Fs2Params,
       di: DescriptorImplicits
   ): Seq[PluginProtos.CodeGeneratorResponse.File] = {
-    file.getServices.asScala.map { service =>
-      import di.{ExtendedServiceDescriptor, ExtendedFileDescriptor}
-
-      val p = new Fs2GrpcServicePrinter(service, fs2params.serviceSuffix, di)
-      val code = p.printService(FunctionalPrinter()).result()
-      val b = PluginProtos.CodeGeneratorResponse.File.newBuilder()
-      b.setName(file.scalaDirectory + "/" + service.name + s"${fs2params.serviceSuffix}.scala")
-      b.setContent(code)
-      b.build
+    file.getServices.asScala.flatMap { service =>
+      generateServiceFile(
+        file,
+        service,
+        fs2params.serviceSuffix + "Trailers",
+        di,
+        new Fs2GrpcExhaustiveTrailersServicePrinter(_, fs2params.serviceSuffix + "Trailers", di)
+      ) ::
+        generateServiceFile(
+          file,
+          service,
+          fs2params.serviceSuffix,
+          di,
+          new Fs2GrpcServicePrinter(_, fs2params.serviceSuffix, di)
+        ) :: Nil
     }.toSeq
   }
 
@@ -66,7 +89,9 @@ object Fs2CodeGenerator extends CodeGenApp {
     parseParameters(request.parameter) match {
       case Right((params, fs2params)) =>
         val implicits = DescriptorImplicits.fromCodeGenRequest(params, request)
-        val srvFiles = request.filesToGenerate.flatMap(generateServiceFiles(_, fs2params, implicits))
+        val srvFiles = request.filesToGenerate.flatMap(
+          generateServiceFiles(_, fs2params, implicits)
+        )
         CodeGenResponse.succeed(
           srvFiles,
           Set(PluginProtos.CodeGeneratorResponse.Feature.FEATURE_PROTO3_OPTIONAL)

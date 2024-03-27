@@ -61,11 +61,19 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   //
 
   def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
+    Fs2UnaryCallHandler.unary(call, options, message, headers).map(_._1)
+
+  def unaryToUnaryCallTrailers(message: Request, headers: Metadata): F[(Response, Metadata)] =
     Fs2UnaryCallHandler.unary(call, options, message, headers)
+
+  def streamingToUnaryCallTrailers(messages: Stream[F, Request], headers: Metadata): F[(Response, Metadata)] =
+    StreamOutput.client(call).flatMap { output =>
+      Fs2UnaryCallHandler.stream(call, options, dispatcher, messages, output, headers)
+    }
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
     StreamOutput.client(call).flatMap { output =>
-      Fs2UnaryCallHandler.stream(call, options, dispatcher, messages, output, headers)
+      Fs2UnaryCallHandler.stream(call, options, dispatcher, messages, output, headers).map(_._1)
     }
 
   def unaryToStreamingCall(message: Request, md: Metadata): Stream[F, Response] =

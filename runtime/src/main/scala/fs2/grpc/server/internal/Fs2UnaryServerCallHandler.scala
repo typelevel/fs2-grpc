@@ -90,7 +90,7 @@ private[server] object Fs2UnaryServerCallHandler {
     }
 
   def unary[F[_]: Sync, Request, Response](
-      impl: (Request, Metadata) => F[Response],
+      impl: (Request, Metadata) => F[(Response, Metadata)],
       options: ServerOptions,
       dispatcher: Dispatcher[F]
   ): ServerCallHandler[Request, Response] =

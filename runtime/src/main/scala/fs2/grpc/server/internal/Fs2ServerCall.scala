@@ -22,6 +22,7 @@
 package fs2.grpc.server.internal
 
 import cats.effect._
+import cats.syntax.all._
 import cats.effect.std.Dispatcher
 import fs2._
 import fs2.grpc.server.ServerCallOptions
@@ -64,15 +65,18 @@ private[server] final class Fs2ServerCall[Request, Response](
         }
         .stream
         .compile
-        .drain,
+        .drain
+        .as(new Metadata()),
       dispatcher
     )
 
-  def unary[F[_]](response: F[Response], dispatcher: Dispatcher[F])(implicit F: Sync[F]): SyncIO[Cancel] =
+  def unary[F[_]](response: F[(Response, Metadata)], dispatcher: Dispatcher[F])(implicit F: Sync[F]): SyncIO[Cancel] =
     run(
       F.map(response) { message =>
         call.sendHeaders(new Metadata())
-        call.sendMessage(message)
+        val (response, trailers) = message
+        call.sendMessage(response)
+        trailers
       },
       dispatcher
     )
@@ -83,15 +87,15 @@ private[server] final class Fs2ServerCall[Request, Response](
   def close(status: Status, metadata: Metadata): SyncIO[Unit] =
     SyncIO(call.close(status, metadata))
 
-  private def run[F[_]](completed: F[Unit], dispatcher: Dispatcher[F])(implicit F: Sync[F]): SyncIO[Cancel] = {
+  private def run[F[_]](completed: F[Metadata], dispatcher: Dispatcher[F])(implicit F: Sync[F]): SyncIO[Cancel] = {
     SyncIO {
       val cancel = dispatcher.unsafeRunCancelable(
         F.handleError {
           F.guaranteeCase(completed) {
-            case Outcome.Succeeded(_) => close(Status.OK, new Metadata()).to[F]
+            case Outcome.Succeeded(trailersF) => trailersF.flatMap(trailers => close(Status.OK, trailers).to[F])
             case Outcome.Errored(e) => handleError(e).to[F]
             case Outcome.Canceled() => close(Status.CANCELLED, new Metadata()).to[F]
-          }
+          }.void
         }(_ => ())
       )
       SyncIO(cancel()).void

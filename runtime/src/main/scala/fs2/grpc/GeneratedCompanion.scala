@@ -123,6 +123,13 @@ trait GeneratedCompanion[Service[*[_], _]] {
       serverOptions: ServerOptions
   ): ServerServiceDefinition
 
+  protected def serviceBindingResource[F[_]: Async, A](
+      dispatcher: Dispatcher[F],
+      serviceImpl: Service[F, A],
+      mkCtx: Metadata => Resource[F, A],
+      serverOptions: ServerOptions
+  ): ServerServiceDefinition
+
   final def service[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       serviceImpl: Service[F, A],
@@ -138,6 +145,13 @@ trait GeneratedCompanion[Service[*[_], _]] {
 
     serviceBinding[F, A](dispatcher, serviceImpl, mkCtx, serverOptions)
   }
+
+  final def service[F[_]: Async, A](
+      serviceImpl: Service[F, A],
+      f: Metadata => Resource[F, A],
+      serverOptions: ServerOptions
+  ): Resource[F, ServerServiceDefinition] =
+    Dispatcher[F].map(serviceBindingResource[F, A](_, serviceImpl, f, serverOptions))
 
   final def service[F[_]: Async, A](
       dispatcher: Dispatcher[F],

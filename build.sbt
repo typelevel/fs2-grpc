@@ -134,7 +134,10 @@ lazy val e2e = (projectMatrix in file("e2e"))
   .settings(
     codeGenClasspath := (codeGenJVM212 / Compile / fullClasspath).value,
     libraryDependencies := Nil,
-    libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),
+    libraryDependencies ++= List(grpcApi, scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),
+    libraryDependencies ++= Seq(
+      "io.grpc" % "grpc-services" % versions.grpc % Test,
+    ),
     Compile / PB.targets := Seq(
       scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
       genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc"

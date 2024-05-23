@@ -9,7 +9,7 @@ object Dependencies {
 
     val fs2 = "3.10.2"
     val catsEffect = "3.5.4"
-    val ceMunit = "1.0.7"
+    val ceMunit = "2.0.0"
 
     val sbtProtoc = "1.0.7"
 
@@ -24,7 +24,7 @@ object Dependencies {
   // Testing
 
   val ceTestkit = "org.typelevel" %% "cats-effect-testkit" % versions.catsEffect
-  val ceMunit = "org.typelevel" %% "munit-cats-effect-3" % versions.ceMunit
+  val ceMunit = "org.typelevel" %% "munit-cats-effect" % versions.ceMunit
   val grpcNetty = "io.grpc" % "grpc-netty-shaded" % versions.grpc
 
   // Compiler & SBT Plugins

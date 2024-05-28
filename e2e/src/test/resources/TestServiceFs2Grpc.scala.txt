@@ -11,6 +11,8 @@ trait TestServiceFs2Grpc[F[_], A] {
 
 object TestServiceFs2Grpc extends _root_.fs2.grpc.GeneratedCompanion[TestServiceFs2Grpc] {
   
+  def serviceDescriptor: _root_.io.grpc.ServiceDescriptor = hello.world.TestServiceGrpc.SERVICE
+  
   def mkClient[F[_]: _root_.cats.effect.Async, A](dispatcher: _root_.cats.effect.std.Dispatcher[F], channel: _root_.io.grpc.Channel, mkMetadata: A => F[_root_.io.grpc.Metadata], clientOptions: _root_.fs2.grpc.client.ClientOptions): TestServiceFs2Grpc[F, A] = new TestServiceFs2Grpc[F, A] {
     def noStreaming(request: hello.world.TestMessage, ctx: A): F[hello.world.TestMessage] = {
       mkMetadata(ctx).flatMap { m =>

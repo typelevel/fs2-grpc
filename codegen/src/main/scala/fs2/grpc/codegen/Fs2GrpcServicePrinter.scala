@@ -54,34 +54,4 @@ class Fs2GrpcServicePrinter(val service: ServiceDescriptor, val serviceSuffix: S
 
 }
 
-object Fs2GrpcServicePrinter {
-
-  private[codegen] object constants {
-
-    private val effPkg = "_root_.cats.effect"
-    private val fs2Pkg = "_root_.fs2"
-    private val fs2grpcPkg = "_root_.fs2.grpc"
-    private val grpcPkg = "_root_.io.grpc"
-
-    // /
-
-    val Ctx = "A"
-
-    val Async = s"$effPkg.Async"
-    val Resource = s"$effPkg.Resource"
-    val Dispatcher = s"$effPkg.std.Dispatcher"
-    val Stream = s"$fs2Pkg.Stream"
-
-    val Fs2ServerCallHandler = s"$fs2grpcPkg.server.Fs2ServerCallHandler"
-    val Fs2ClientCall = s"$fs2grpcPkg.client.Fs2ClientCall"
-    val ClientOptions = s"$fs2grpcPkg.client.ClientOptions"
-    val ServerOptions = s"$fs2grpcPkg.server.ServerOptions"
-    val Companion = s"$fs2grpcPkg.GeneratedCompanion"
-
-    val ServerServiceDefinition = s"$grpcPkg.ServerServiceDefinition"
-    val Channel = s"$grpcPkg.Channel"
-    val Metadata = s"$grpcPkg.Metadata"
-
-  }
-
-}
+object Fs2GrpcServicePrinter {}

@@ -38,6 +38,15 @@ class Fs2ServerCallHandler[F[_]: Async] private (
   def unaryToUnaryCall[Request, Response](
       implementation: (Request, Metadata) => F[Response]
   ): ServerCallHandler[Request, Response] =
+    Fs2UnaryServerCallHandler.unary(
+      (req, meta) => implementation(req, meta).map((_, new Metadata())),
+      options,
+      dispatcher
+    )
+
+  def unaryToUnaryCallTrailers[Request, Response](
+      implementation: (Request, Metadata) => F[(Response, Metadata)]
+  ): ServerCallHandler[Request, Response] =
     Fs2UnaryServerCallHandler.unary(implementation, options, dispatcher)
 
   def unaryToStreamingCall[Request, Response](
@@ -45,12 +54,22 @@ class Fs2ServerCallHandler[F[_]: Async] private (
   ): ServerCallHandler[Request, Response] =
     Fs2UnaryServerCallHandler.stream(implementation, options, dispatcher)
 
+  def streamingToUnaryCallTrailers[Request, Response](
+      implementation: (Stream[F, Request], Metadata) => F[(Response, Metadata)]
+  ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
+    def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
+      val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, SyncIO.unit, dispatcher, options))
+      listener.unsafeUnaryResponse(new Metadata(), implementation(_, headers))
+      listener
+    }
+  }
+
   def streamingToUnaryCall[Request, Response](
       implementation: (Stream[F, Request], Metadata) => F[Response]
   ): ServerCallHandler[Request, Response] = new ServerCallHandler[Request, Response] {
     def startCall(call: ServerCall[Request, Response], headers: Metadata): ServerCall.Listener[Request] = {
       val listener = dispatcher.unsafeRunSync(Fs2StreamServerCallListener[F](call, SyncIO.unit, dispatcher, options))
-      listener.unsafeUnaryResponse(new Metadata(), implementation(_, headers))
+      listener.unsafeUnaryResponse(new Metadata(), implementation(_, headers).map((_, new Metadata())))
       listener
     }
   }

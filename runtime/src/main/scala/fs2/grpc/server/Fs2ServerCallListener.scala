@@ -49,30 +49,45 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
     }
   }
 
-  private def handleUnaryResponse(headers: Metadata, response: F[Response])(implicit F: Sync[F]): F[Unit] =
-    call.sendHeaders(headers) *> call.request(1) *> response >>= call.sendSingleMessage
+  private def handleUnaryResponse(headers: Metadata, response: F[(Response, Metadata)])(implicit
+      F: Sync[F]
+  ): F[Metadata] = {
+    for {
+      _ <- call.sendHeaders(headers)
+      _ <- call.request(1)
+      responseWithTrailers <- response
+      _ <- call.sendSingleMessage(responseWithTrailers._1)
+    } yield responseWithTrailers._2
+  }
 
   private def handleStreamResponse(headers: Metadata, sendResponse: Stream[F, Nothing])(implicit F: Sync[F]): F[Unit] =
     call.sendHeaders(headers) *> call.request(1) *> sendResponse.compile.drain
 
-  private def unsafeRun(f: F[Unit])(implicit F: Async[F]): Unit = {
+  private def unsafeRun(f: F[Metadata])(implicit F: Async[F]): Unit = {
     val bracketed =
       F.handleError {
         F.guaranteeCase(f) {
-          case Outcome.Succeeded(_) => call.closeStream(Status.OK, new Metadata())
+          case Outcome.Succeeded(mdF) =>
+            for {
+              md <- mdF
+              _ <- call.closeStream(Status.OK, md)
+            } yield ()
+
           case Outcome.Canceled() => call.closeStream(Status.CANCELLED, new Metadata())
           case Outcome.Errored(t) => reportError(t)
-        }
+        }.void
       }(_ => ())
 
     // Exceptions are reported by closing the call
     dispatcher.unsafeRunAndForget(F.race(bracketed, isCancelled.get))
   }
 
-  def unsafeUnaryResponse(headers: Metadata, implementation: G[Request] => F[Response])(implicit
+  def unsafeUnaryResponse(headers: Metadata, implementation: G[Request] => F[(Response, Metadata)])(implicit
       F: Async[F]
   ): Unit =
-    unsafeRun(handleUnaryResponse(headers, implementation(source)))
+    unsafeRun(
+      handleUnaryResponse(headers, implementation(source))
+    )
 
   def unsafeStreamResponse(
       streamOutput: StreamOutput[F, Response],
@@ -81,5 +96,7 @@ private[server] trait Fs2ServerCallListener[F[_], G[_], Request, Response] {
   )(implicit
       F: Async[F]
   ): Unit =
-    unsafeRun(handleStreamResponse(headers, streamOutput.writeStream(implementation(source))))
+    unsafeRun(
+      handleStreamResponse(headers, streamOutput.writeStream(implementation(source))).as(new Metadata())
+    )
 }

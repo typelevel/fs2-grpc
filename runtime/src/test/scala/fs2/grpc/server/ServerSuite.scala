@@ -133,9 +133,13 @@ class ServerSuite extends Fs2GrpcSuite {
 
   runTest0("resource awaits termination of server") { (tc, r, _) =>
     import fs2.grpc.syntax.all._
-    import netty.shaded.io.grpc.netty.NettyServerBuilder
+    import io.grpc._
 
-    val result = NettyServerBuilder.forPort(0).resource[IO].use(IO.pure).unsafeToFuture()(r)
+    val result = Grpc
+      .newServerBuilderForPort(0, InsecureServerCredentials.create())
+      .resource[IO]
+      .use(IO.pure)
+      .unsafeToFuture()(r)
     tc.tick()
 
     val server = result.value.get.get

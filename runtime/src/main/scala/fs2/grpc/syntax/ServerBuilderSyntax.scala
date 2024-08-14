@@ -29,11 +29,11 @@ import cats.syntax.all._
 import io.grpc.{Server, ServerBuilder}
 
 trait ServerBuilderSyntax {
-  implicit final def fs2GrpcSyntaxServerBuilder[SB <: ServerBuilder[SB]](builder: SB): ServerBuilderOps[SB] =
-    new ServerBuilderOps[SB](builder)
+  implicit final def fs2GrpcSyntaxServerBuilder(builder: ServerBuilder[?]): ServerBuilderOps =
+    new ServerBuilderOps(builder)
 }
 
-final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends AnyVal {
+final class ServerBuilderOps(val builder: ServerBuilder[?]) extends AnyVal {
 
   /** Builds a `Server` into a resource. The server is shut down when the resource is released. Shutdown is as follows:
     *

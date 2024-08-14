@@ -51,15 +51,14 @@ lazy val server =
 
 ## Creating a client
 
-A `ManagedChannel` is the type used by `grpc-java` to manage a connection to a particular server. This library provides syntax for `ManagedChannelBuilder` which creates a `Resource` which can manage the shutdown of the channel, by calling `.resource[F]` where `F` has an instance of the `Sync` typeclass. This implementation will do a drain of the channel, and attempt to shut down the channel, forcefully closing after 30 seconds. An example of the syntax using `grpc-netty` is:
+A `ManagedChannel` is the type used by `grpc-java` to manage a connection to a particular server. This library provides syntax for `ManagedChannelBuilder` which creates a `Resource` which can manage the shutdown of the channel, by calling `.resource[F]` where `F` has an instance of the `Sync` typeclass. This implementation will do a drain of the channel, and attempt to shut down the channel, forcefully closing after 30 seconds. An example of the syntax is:
 
 ```scala
-import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder
+import io.grpc._
 import fs2.grpc.syntax.all._
 
 val managedChannelResource: Resource[IO, ManagedChannel] =
-  NettyChannelBuilder
-    .forAddress("127.0.0.1", 9999)
+  Grpc.newChannelBuilderForAddress("127.0.0.1", 9999, InsecureChannelCredentials.create())
     .resource[IO]
 ```
 
@@ -84,14 +83,14 @@ The generated code provides a method `bindServiceResource[F]`, for any `F` which
 A `Server` is the type used by `grpc-java` to manage the server connections and lifecycle. This library provides syntax for `ServerBuilder`, which mirrors the pattern for the client. An example is:
 
 ```scala
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
+import io.grpc._
 import fs2.grpc.syntax.all._
 
 val helloService: Resource[IO, ServerServiceDefinition] = 
   MyFs2Grpc.bindServiceResource[IO](new MyImpl())
 
-def run(service: ServerServiceDefinition) = NettyServerBuilder
-  .forPort(9999)
+def run(service: ServerServiceDefinition) = Grpc
+  .newServerBuilderForPort(9999, InsecureServerCredentials.create())
   .addService(service)
   .resource[IO]
   .evalMap(server => IO(server.start()))

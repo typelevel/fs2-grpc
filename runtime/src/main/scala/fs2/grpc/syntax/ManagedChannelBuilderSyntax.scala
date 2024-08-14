@@ -29,13 +29,13 @@ import cats.syntax.all._
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 
 trait ManagedChannelBuilderSyntax {
-  implicit final def fs2GrpcSyntaxManagedChannelBuilder[MCB <: ManagedChannelBuilder[MCB]](
-      builder: MCB
-  ): ManagedChannelBuilderOps[MCB] =
-    new ManagedChannelBuilderOps[MCB](builder)
+  implicit final def fs2GrpcSyntaxManagedChannelBuilder(
+      builder: ManagedChannelBuilder[?]
+  ): ManagedChannelBuilderOps =
+    new ManagedChannelBuilderOps(builder)
 }
 
-final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val builder: MCB) extends AnyVal {
+final class ManagedChannelBuilderOps(val builder: ManagedChannelBuilder[?]) extends AnyVal {
 
   /** Builds a `ManagedChannel` into a resource. The managed channel is shut down when the resource is released.
     * Shutdown is as follows:

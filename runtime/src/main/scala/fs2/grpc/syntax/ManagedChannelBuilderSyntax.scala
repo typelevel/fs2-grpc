@@ -24,8 +24,8 @@ package grpc
 package syntax
 
 import java.util.concurrent.TimeUnit
-import scala.concurrent._
 import cats.effect._
+import cats.syntax.all._
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 
 trait ManagedChannelBuilderSyntax {
@@ -48,13 +48,11 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
     */
   def resource[F[_]](implicit F: Sync[F]): Resource[F, ManagedChannel] =
     resourceWithShutdown { ch =>
-      F.delay {
-        ch.shutdown()
-        if (!blocking(ch.awaitTermination(30, TimeUnit.SECONDS))) {
-          ch.shutdownNow()
-          ()
-        }
-      }
+      for {
+        _ <- F.delay(ch.shutdown())
+        terminated <- F.interruptible(ch.awaitTermination(30, TimeUnit.SECONDS))
+        _ <- F.unlessA(terminated)(F.delay(ch.shutdownNow()))
+      } yield (())
     }
 
   /** Builds a `ManagedChannel` into a resource. The managed channel is shut down when the resource is released.

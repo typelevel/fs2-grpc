@@ -107,12 +107,20 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
 
   private[this] def serviceObject: PrinterEndo =
     _.add(s"object $serviceNameFs2 extends $Companion[$serviceNameFs2] {").indent.newline
+      .call(serviceDescriptor)
+      .newline
       .call(serviceClient)
       .newline
       .call(serviceBinding)
       .outdent
       .newline
       .add("}")
+
+  private[this] def serviceDescriptor: PrinterEndo = {
+    _.add(
+      s"def serviceDescriptor: ${Fs2AbstractServicePrinter.constants.ServiceDescriptor} = ${service.grpcDescriptor.fullName}"
+    )
+  }
 
   private[this] def serviceClient: PrinterEndo = {
     _.add(
@@ -170,6 +178,7 @@ object Fs2AbstractServicePrinter {
     val ServerServiceDefinition = s"$grpcPkg.ServerServiceDefinition"
     val Channel = s"$grpcPkg.Channel"
     val Metadata = s"$grpcPkg.Metadata"
+    val ServiceDescriptor = s"$grpcPkg.ServiceDescriptor"
 
   }
 

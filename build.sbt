@@ -4,7 +4,7 @@ import Dependencies._
 
 lazy val Scala3 = "3.3.3"
 lazy val Scala213 = "2.13.14"
-lazy val Scala212 = "2.12.19"
+lazy val Scala212 = "2.12.20"
 
 lazy val axesDefault =
   Seq(VirtualAxis.scalaABIVersion(Scala213), VirtualAxis.jvm)

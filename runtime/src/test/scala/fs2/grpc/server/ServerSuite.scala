@@ -239,7 +239,7 @@ class ServerSuite extends Fs2GrpcSuite {
       }
 
       override def unsafeRunSync[A](fa: IO[A]): A =
-        d0.unsafeRunSync(fa.onError(_ => IO { errorInDispatcher = true }))
+        d0.unsafeRunSync(fa.onError { case _ => IO { errorInDispatcher = true } })
     }
 
     val dummy = new DummyServerCall

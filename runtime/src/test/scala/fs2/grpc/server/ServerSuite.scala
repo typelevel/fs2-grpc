@@ -238,8 +238,13 @@ class ServerSuite extends Fs2GrpcSuite {
         (reported, cancel)
       }
 
-      override def unsafeRunSync[A](fa: IO[A]): A =
-        d0.unsafeRunSync(fa.onError(_ => IO { errorInDispatcher = true }))
+      override def unsafeRunSync[A](fa: IO[A]): A = {
+        val handler: PartialFunction[Throwable, IO[Unit]] = { case _: Throwable =>
+          IO { errorInDispatcher = true }
+        }
+
+        d0.unsafeRunSync(fa.onError(handler))
+      }
     }
 
     val dummy = new DummyServerCall

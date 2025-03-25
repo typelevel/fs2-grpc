@@ -18,7 +18,7 @@ inThisBuild(
   List(
     githubWorkflowBuildSbtStepPreamble := Seq(),
     scalaVersion := Scala3,
-    tlBaseVersion := "2.7",
+    tlBaseVersion := "2.8",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organizationName := "Gary Coady / Fs2 Grpc Developers",

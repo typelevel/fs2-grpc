@@ -38,6 +38,7 @@ import fs2.grpc.codegen.Fs2AbstractServicePrinter.constants.{
 }
 import scalapb.compiler.{DescriptorImplicits, FunctionalPrinter}
 import scalapb.compiler.FunctionalPrinter.PrinterEndo
+import scalapb.compiler.ProtobufGenerator.asScalaDocBlock
 
 abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
 
@@ -90,8 +91,6 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
     p.add(s".addMethod($descriptor, $handler((r, m) => $eval.flatMap($serviceCall(r, _))))")
   }
 
-  private[this] def serviceMethods: PrinterEndo = _.seq(service.methods.map(serviceMethodSignature))
-
   private[this] def serviceMethodImplementations: PrinterEndo =
     _.call(service.methods.map(serviceMethodImplementation): _*)
 
@@ -103,7 +102,14 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
       .outdent
 
   private[this] def serviceTrait: PrinterEndo =
-    _.add(s"trait $serviceNameFs2[F[_], $Ctx] {").indent.call(serviceMethods).outdent.add("}")
+    _.call(generateScalaDoc(service))
+      .add(s"trait $serviceNameFs2[F[_], $Ctx] {")
+      .indent
+      .print(service.methods) { case (p, method) =>
+        p.call(generateScalaDoc(method)).add(serviceMethodSignature(method))
+      }
+      .outdent
+      .add("}")
 
   private[this] def serviceObject: PrinterEndo =
     _.add(s"object $serviceNameFs2 extends $Companion[$serviceNameFs2] {").indent.newline
@@ -141,7 +147,15 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
       .add("}")
   }
 
-  // /
+  private[this] def generateScalaDoc(service: ServiceDescriptor): PrinterEndo = { fp =>
+    val lines = asScalaDocBlock(service.comment.map(_.split('\n').toSeq).getOrElse(Seq.empty))
+    fp.add(lines: _*)
+  }
+
+  private[this] def generateScalaDoc(method: MethodDescriptor): PrinterEndo = { fp =>
+    val lines = asScalaDocBlock(method.comment.map(_.split('\n').toSeq).getOrElse(Seq.empty))
+    fp.add(lines: _*)
+  }
 
   def printService(printer: FunctionalPrinter): FunctionalPrinter = {
     printer

@@ -4,9 +4,15 @@ import "test.proto";
 
 package hello.world;
 
-service TestService {  
+// TestService: Example gRPC service used in e2e tests
+// It demonstrates all four RPC shapes.
+service TestService {
+  // Unary RPC: no streaming in either direction
   rpc noStreaming (TestMessage) returns (TestMessage);
+  // Client streaming RPC: client streams, server returns a single response
   rpc clientStreaming (stream TestMessage) returns (TestMessage);
+  // Server streaming RPC: client sends one request, server streams responses
   rpc serverStreaming (TestMessage) returns (stream TestMessage);
+  // Bidirectional streaming RPC: both client and server stream
   rpc bothStreaming (stream TestMessage) returns (stream TestMessage);
 }

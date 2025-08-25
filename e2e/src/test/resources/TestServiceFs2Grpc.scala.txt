@@ -2,10 +2,21 @@ package hello.world
 
 import _root_.cats.syntax.all._
 
+/** TestService: Example gRPC service used in e2e tests
+  * It demonstrates all four RPC shapes.
+  */
 trait TestServiceFs2Grpc[F[_], A] {
+  /** Unary RPC: no streaming in either direction
+    */
   def noStreaming(request: hello.world.TestMessage, ctx: A): F[hello.world.TestMessage]
+  /** Client streaming RPC: client streams, server returns a single response
+    */
   def clientStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): F[hello.world.TestMessage]
+  /** Server streaming RPC: client sends one request, server streams responses
+    */
   def serverStreaming(request: hello.world.TestMessage, ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage]
+  /** Bidirectional streaming RPC: both client and server stream
+    */
   def bothStreaming(request: _root_.fs2.Stream[F, hello.world.TestMessage], ctx: A): _root_.fs2.Stream[F, hello.world.TestMessage]
 }
 

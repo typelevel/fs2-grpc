@@ -360,7 +360,7 @@ class ServerSuite extends Fs2GrpcSuite {
 
     tc.tick()
 
-    assertEquals(dummy.requested, 1)
+    assertEquals(dummy.requested, 2)
 
     listener.onMessage("1")
     tc.tick()

@@ -21,7 +21,7 @@
 
 package fs2
 package grpc
-package client
+package shared
 
 import cats.effect._
 import munit._

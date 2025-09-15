@@ -28,7 +28,7 @@ import cats.syntax.all._
 import cats.effect.kernel.Deferred
 import cats.effect.{Async, SyncIO}
 import cats.effect.std.Dispatcher
-import fs2.grpc.client.StreamIngest
+import fs2.grpc.shared.StreamIngest
 import io.grpc.ServerCall
 
 private[server] class Fs2StreamServerCallListener[F[_], Request, Response] private (
@@ -67,7 +67,8 @@ private[server] object Fs2StreamServerCallListener {
     )(implicit F: Async[F]): F[Fs2StreamServerCallListener[F, Request, Response]] = for {
       isCancelled <- Deferred[F, Unit]
       request = (n: Int) => F.delay(call.request(n))
-      ingest <- StreamIngest[F, Request](request, prefetchN = 1)
+      prefetchN = math.max(options.prefetchN, 1)
+      ingest <- StreamIngest[F, Request](request, prefetchN)
       serverCall <- Fs2ServerCall[F, Request, Response](call, options)
     } yield new Fs2StreamServerCallListener[F, Request, Response](
       ingest,

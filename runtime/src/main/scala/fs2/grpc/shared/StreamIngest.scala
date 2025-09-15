@@ -21,7 +21,7 @@
 
 package fs2
 package grpc
-package client
+package shared
 
 import cats.implicits._
 import cats.effect.{Concurrent, Ref}

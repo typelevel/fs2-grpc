@@ -21,10 +21,10 @@
 
 package fs2
 package grpc
-package client
+package shared
 
 import cats.implicits._
-import cats.effect.Concurrent
+import cats.effect.{Concurrent, Ref}
 import cats.effect.std.Queue
 
 private[grpc] trait StreamIngest[F[_], T] {
@@ -39,41 +39,63 @@ private[grpc] object StreamIngest {
       request: Int => F[Unit],
       prefetchN: Int
   ): F[StreamIngest[F, T]] =
-    Queue
-      .unbounded[F, Either[Option[Throwable], T]]
-      .map(q => create[F, T](request, prefetchN, q))
+    (Ref[F].of(0), Queue.unbounded[F, Either[Option[Throwable], T]])
+      .mapN((r, q) => create[F, T](request, prefetchN, r, q))
 
   def create[F[_], T](
       request: Int => F[Unit],
       prefetchN: Int,
+      requested: Ref[F, Int],
       queue: Queue[F, Either[Option[Throwable], T]]
   )(implicit F: Concurrent[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
+    private val limit: Int = math.max(1, prefetchN)
+    private def updateRequests: F[Unit] = {
+      queue.size.flatMap { queued =>
+        requested.flatModify { requested =>
+          val total = queued + requested
+          val additional = math.max(0, limit - total)
 
-    val limit: Int =
-      math.max(1, prefetchN)
-
-    val ensureMessages: F[Unit] =
-      queue.size.flatMap(qs => request(1).whenA(qs < limit))
+          (
+            requested + additional,
+            request(additional).whenA(additional > 0)
+          )
+        }
+      }
+    }
 
     def onMessage(msg: T): F[Unit] =
-      queue.offer(msg.asRight) *> ensureMessages
+      queue.offer(msg.asRight) *> requested.update(r => math.max(0, r - 1))
 
     def onClose(error: Option[Throwable]): F[Unit] =
       queue.offer(error.asLeft)
 
     val messages: Stream[F, T] = {
+      type S = Either[Option[Throwable], Chunk[T]]
 
-      val run: F[Option[T]] =
-        queue.take.flatMap {
-          case Right(v) => ensureMessages *> v.some.pure[F]
-          case Left(Some(error)) => F.raiseError(error)
-          case Left(None) => none[T].pure[F]
+      def zero: S = Chunk.empty.asRight
+      def loop(state: S): F[Option[(Chunk[T], S)]] =
+        state match {
+          case Left(None) => F.pure(none)
+          case Left(Some(err)) => F.raiseError(err)
+          case Right(acc) =>
+            queue.tryTake.flatMap {
+              case Some(Right(value)) => loop((acc ++ Chunk.singleton(value)).asRight)
+              case Some(Left(err)) =>
+                if (acc.isEmpty) loop(err.asLeft)
+                else F.pure((acc.toIndexedChunk, err.asLeft).some)
+              case None =>
+                val await = if (acc.isEmpty) queue.take.flatMap {
+                  case Right(value) => loop(Chunk.singleton(value).asRight)
+                  case Left(err) => loop(err.asLeft)
+                }
+                else F.pure((acc.toIndexedChunk, zero).some)
+
+                updateRequests *> await
+            }
         }
 
-      Stream.repeatEval(run).unNoneTerminate
-
+      Stream.unfoldChunkEval(zero)(loop)
     }
-
   }
 
 }

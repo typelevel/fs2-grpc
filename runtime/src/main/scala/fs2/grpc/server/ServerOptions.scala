@@ -24,12 +24,22 @@ package grpc
 package server
 
 sealed abstract class ServerOptions private (
+    val prefetchN: Int,
     val callOptionsFn: ServerCallOptions => ServerCallOptions
 ) {
 
   private def copy(
-      callOptionsFn: ServerCallOptions => ServerCallOptions
-  ): ServerOptions = new ServerOptions(callOptionsFn) {}
+      prefetchN: Int = this.prefetchN,
+      callOptionsFn: ServerCallOptions => ServerCallOptions = this.callOptionsFn
+  ): ServerOptions = new ServerOptions(prefetchN, callOptionsFn) {}
+
+  /** Prefetch up to @param n messages from a client. The server will try to keep the internal buffer filled according
+    * to the provided value.
+    *
+    * If the provided value is less than 1 it defaults to 1.
+    */
+  def withPrefetchN(n: Int): ServerOptions =
+    copy(prefetchN = math.max(n, 1))
 
   /** Function that is applied on `fs2.grpc.ServerCallOptions.default` for each new RPC call.
     */
@@ -40,6 +50,7 @@ sealed abstract class ServerOptions private (
 object ServerOptions {
 
   val default: ServerOptions = new ServerOptions(
+    prefetchN = 1,
     callOptionsFn = identity
   ) {}
 

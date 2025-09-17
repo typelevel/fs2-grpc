@@ -27,6 +27,7 @@ import cats.effect.SyncIO
 import cats.implicits._
 import cats.effect.kernel.Concurrent
 import cats.effect.std.Dispatcher
+import fs2.grpc.shared.StreamIngest
 import io.grpc.{ClientCall, Metadata, Status}
 
 private[client] class Fs2StreamClientCallListener[F[_], Response] private (

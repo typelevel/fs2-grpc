@@ -41,7 +41,7 @@ private[client] object Fs2UnaryCallHandler {
         callback: Either[Throwable, (R, Metadata)] => Unit,
         pf: PartialFunction[StatusRuntimeException, Exception]
     ): F[Ref[SyncIO, ReceiveState[R]]] =
-      Ref.in(new PendingMessage[R]({
+      Ref.in[F, SyncIO, ReceiveState[R]](new PendingMessage[R]({
         case r: Right[Throwable, (R, Metadata)] => callback(r)
         case Left(e: StatusRuntimeException) => callback(Left(pf.lift(e).getOrElse(e)))
         case l: Left[Throwable, (R, Metadata)] => callback(l)
@@ -123,14 +123,14 @@ private[client] object Fs2UnaryCallHandler {
       message: Request,
       headers: Metadata
   )(implicit F: Async[F]): F[(Response, Metadata)] = F.async[(Response, Metadata)] { cb =>
-    ReceiveState.init(cb, options.errorAdapter).map { state =>
+    ReceiveState.init[F, Response](cb, options.errorAdapter).map { state =>
       call.start(mkListener[Response](state, SyncIO.unit), headers)
       // Initially ask for two responses from flow-control so that if a misbehaving server
       // sends more than one responses, we can catch it and fail it in the listener.
       call.request(2)
       call.sendMessage(message)
       call.halfClose()
-      Some(onCancel(call))
+      Some(onCancel[F](call))
     }
   }
 
@@ -154,11 +154,11 @@ private[client] object Fs2UnaryCallHandler {
         .guaranteeCase {
           case Outcome.Succeeded(_) => F.delay(call.halfClose())
           case Outcome.Errored(e) => F.delay(call.cancel(e.getMessage, e))
-          case Outcome.Canceled() => onCancel(call)
+          case Outcome.Canceled() => onCancel[F](call)
         }
         .handleError(_ => ())
         .start
-        .map(sending => Some(sending.cancel >> onCancel(call)))
+        .map(sending => Some(sending.cancel >> onCancel[F](call)))
     }
   }
 

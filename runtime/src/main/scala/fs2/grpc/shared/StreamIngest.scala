@@ -89,7 +89,7 @@ private[grpc] object StreamIngest {
             }
         }
 
-      Stream.unfoldChunkEval(zero(0))(loop)
+      Stream.unfoldChunkEval[F, S, T](zero(0))(loop)
     }
   }
 

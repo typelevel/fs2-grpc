@@ -61,28 +61,28 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
   //
 
   def unaryToUnaryCall(message: Request, headers: Metadata): F[Response] =
-    Fs2UnaryCallHandler.unary(call, options, message, headers).map(_._1)
+    Fs2UnaryCallHandler.unary[F, Request, Response](call, options, message, headers).map(_._1)
 
   def unaryToUnaryCallTrailers(message: Request, headers: Metadata): F[(Response, Metadata)] =
-    Fs2UnaryCallHandler.unary(call, options, message, headers)
+    Fs2UnaryCallHandler.unary[F, Request, Response](call, options, message, headers)
 
   def streamingToUnaryCallTrailers(messages: Stream[F, Request], headers: Metadata): F[(Response, Metadata)] =
-    StreamOutput.client(call).flatMap { output =>
-      Fs2UnaryCallHandler.stream(call, options, dispatcher, messages, output, headers)
+    StreamOutput.client[F, Request, Response](call).flatMap { output =>
+      Fs2UnaryCallHandler.stream[F, Request, Response](call, options, dispatcher, messages, output, headers)
     }
 
   def streamingToUnaryCall(messages: Stream[F, Request], headers: Metadata): F[Response] =
-    StreamOutput.client(call).flatMap { output =>
-      Fs2UnaryCallHandler.stream(call, options, dispatcher, messages, output, headers).map(_._1)
+    StreamOutput.client[F, Request, Response](call).flatMap { output =>
+      Fs2UnaryCallHandler.stream[F, Request, Response](call, options, dispatcher, messages, output, headers).map(_._1)
     }
 
   def unaryToStreamingCall(message: Request, md: Metadata): Stream[F, Response] =
     Stream
       .resource(mkStreamListenerR(md, SyncIO.unit))
-      .flatMap(Stream.exec(sendSingleMessage(message)) ++ _.stream.adaptError(ea))
+      .flatMap(Stream.exec[F](sendSingleMessage(message)) ++ _.stream.adaptError(ea))
 
   def streamingToStreamingCall(messages: Stream[F, Request], md: Metadata): Stream[F, Response] = {
-    val listenerAndOutput = Resource.eval(StreamOutput.client(call)).flatMap { output =>
+    val listenerAndOutput = Resource.eval(StreamOutput.client[F, Request, Response](call)).flatMap { output =>
       mkStreamListenerR(md, output.onReadySync(dispatcher)).map((_, output))
     }
 

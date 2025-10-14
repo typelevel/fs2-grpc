@@ -35,7 +35,8 @@ inThisBuild(
   ) ++ List(
     mimaBinaryIssueFilters ++= Seq(
       // API that is not extended by end-users
-      ProblemFilters.exclude[ReversedMissingMethodProblem]("fs2.grpc.GeneratedCompanion.mkClient"),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("fs2.grpc.GeneratedCompanion.mkClientFull"),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("fs2.grpc.GeneratedCompanion.serviceBindingFull"),
       ProblemFilters.exclude[ReversedMissingMethodProblem]("fs2.grpc.GeneratedCompanion.serviceDescriptor"),
       // package private APIs
       ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.client.StreamIngest.create"),
@@ -138,7 +139,13 @@ lazy val e2e = (projectMatrix in file("e2e"))
   .settings(
     codeGenClasspath := (codeGenJVM212 / Compile / fullClasspath).value,
     libraryDependencies := Nil,
-    libraryDependencies ++= List(scalaPbGrpcRuntime, scalaPbRuntime, scalaPbRuntime % "protobuf", ceMunit % Test),
+    libraryDependencies ++= List(
+      scalaPbGrpcRuntime,
+      scalaPbRuntime,
+      scalaPbRuntime % "protobuf",
+      ceMunit % Test,
+      "io.grpc" % "grpc-inprocess" % versions.grpc % Test
+    ),
     Compile / PB.targets := Seq(
       scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
       genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc"

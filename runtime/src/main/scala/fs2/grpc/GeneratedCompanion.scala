@@ -26,8 +26,8 @@ import cats.syntax.all._
 import cats.effect.{Async, Resource}
 import cats.effect.std.Dispatcher
 import io.grpc._
-import fs2.grpc.client.ClientOptions
-import fs2.grpc.server.ServerOptions
+import fs2.grpc.client.{ClientOptions, ClientAspect}
+import fs2.grpc.server.{ServerOptions, ServiceAspect}
 
 trait GeneratedCompanion[Service[*[_], _]] {
 
@@ -39,12 +39,25 @@ trait GeneratedCompanion[Service[*[_], _]] {
 
 ///=== Client ==========================================================================================================
 
-  def mkClient[F[_]: Async, A](
+  def mkClientFull[F[_], G[_]: Async, A](
+      dispatcher: Dispatcher[G],
+      channel: Channel,
+      clientAspect: ClientAspect[F, G, A],
+      clientOptions: ClientOptions
+  ): Service[F, A]
+
+  final def mkClient[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       channel: Channel,
       mkMetadata: A => F[Metadata],
       clientOptions: ClientOptions
-  ): Service[F, A]
+  ): Service[F, A] =
+    mkClientFull[F, F, A](
+      dispatcher,
+      channel,
+      (new ClientAspect.Default[F] {}).contraModify(mkMetadata),
+      clientOptions
+    )
 
   final def mkClient[F[_]: Async, A](
       dispatcher: Dispatcher[F],
@@ -120,12 +133,33 @@ trait GeneratedCompanion[Service[*[_], _]] {
 
 ///=== Service =========================================================================================================
 
+  protected def serviceBindingFull[F[_], G[_]: Async, A](
+      dispatcher: Dispatcher[G],
+      serviceImpl: Service[F, A],
+      serviceAspect: ServiceAspect[F, G, A],
+      serverOptions: ServerOptions
+  ): ServerServiceDefinition
+
   protected def serviceBinding[F[_]: Async, A](
       dispatcher: Dispatcher[F],
       serviceImpl: Service[F, A],
       mkCtx: Metadata => F[A],
       serverOptions: ServerOptions
-  ): ServerServiceDefinition
+  ): ServerServiceDefinition =
+    serviceBindingFull[F, F, A](
+      dispatcher,
+      serviceImpl,
+      (new ServiceAspect.Default[F] {}).modify(mkCtx),
+      serverOptions
+    )
+
+  final def serviceFull[F[_], G[_]: Async, A](
+      dispatcher: Dispatcher[G],
+      serviceImpl: Service[F, A],
+      serviceAspect: ServiceAspect[F, G, A],
+      serverOptions: ServerOptions
+  ): ServerServiceDefinition =
+    serviceBindingFull[F, G, A](dispatcher, serviceImpl, serviceAspect, serverOptions)
 
   final def service[F[_]: Async, A](
       dispatcher: Dispatcher[F],

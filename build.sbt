@@ -48,9 +48,14 @@ inThisBuild(
       // deleted private classes
       ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.client.Fs2UnaryClientCallListener*"),
       ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*"),
-      // technically, it's binary breaking, but it's a case class
-      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params*"),
-      ProblemFilters.exclude[MissingTypesProblem]("fs2.grpc.codegen.Fs2Params*"),
+      // Fs2Params is replaced with a sealed trait
+      ProblemFilters.exclude[IncompatibleTemplateDefProblem]("fs2.grpc.codegen.Fs2Params"),
+      ProblemFilters.exclude[MissingTypesProblem]("fs2.grpc.codegen.Fs2Params$"),
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.<init>$default$1"),
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.apply"),
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.apply$default$1"),
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.unapply"),
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.fromProduct")
     )
   )
 )

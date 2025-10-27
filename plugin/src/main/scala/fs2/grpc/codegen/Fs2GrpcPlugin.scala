@@ -137,7 +137,7 @@ object Fs2GrpcPlugin extends AutoPlugin {
                 ),
                 scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString) :+
                   s"serviceSuffix=${fs2GrpcServiceSuffix.value}" +
-                    s"disableTrailers=${fs2GrpcDisableTrailers.value}"
+                  s"disableTrailers=${fs2GrpcDisableTrailers.value}"
               ),
               fs2GrpcOutputPath.value
             )

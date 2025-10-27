@@ -18,7 +18,7 @@ inThisBuild(
   List(
     githubWorkflowBuildSbtStepPreamble := Seq(),
     scalaVersion := Scala3,
-    tlBaseVersion := "2.11",
+    tlBaseVersion := "2.12",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organizationName := "Gary Coady / Fs2 Grpc Developers",
@@ -47,7 +47,10 @@ inThisBuild(
       ProblemFilters.exclude[MissingFieldProblem]("fs2.grpc.codegen.Fs2GrpcServicePrinter.constants"),
       // deleted private classes
       ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.client.Fs2UnaryClientCallListener*"),
-      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*")
+      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*"),
+      // technically, it's binary breaking, but it's a case class
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params*"),
+      ProblemFilters.exclude[MissingTypesProblem]("fs2.grpc.codegen.Fs2Params*"),
     )
   )
 )
@@ -146,10 +149,18 @@ lazy val e2e = (projectMatrix in file("e2e"))
       ceMunit % Test,
       "io.grpc" % "grpc-inprocess" % versions.grpc % Test
     ),
-    Compile / PB.targets := Seq(
-      scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
-      genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc"
-    ),
+    Compile / PB.targets := {
+      val disableTrailers = new {
+        val args = Seq("serviceSuffix=Fs2GrpcDisableTrailers", "disableTrailers=true")
+        val output = (Compile / sourceManaged).value / "fs2-grpc" / "disable-trailers"
+      }
+
+      Seq(
+        scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
+        genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc",
+        (genModule(codegenFullName + "$"), disableTrailers.args) -> disableTrailers.output
+      )
+    },
     buildInfoPackage := "fs2.grpc.e2e.buildinfo",
     buildInfoKeys := Seq[BuildInfoKey]("sourceManaged" -> (Compile / sourceManaged).value / "fs2-grpc"),
     githubWorkflowArtifactUpload := false,

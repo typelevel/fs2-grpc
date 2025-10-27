@@ -30,7 +30,10 @@ import scalapb.options.Scalapb
 
 import scala.jdk.CollectionConverters.*
 
-final case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
+final case class Fs2Params(
+    serviceSuffix: String = "Fs2Grpc",
+    disableTrailers: Boolean = false
+)
 
 object Fs2CodeGenerator extends CodeGenApp {
 
@@ -56,34 +59,56 @@ object Fs2CodeGenerator extends CodeGenApp {
       di: DescriptorImplicits
   ): Seq[PluginProtos.CodeGeneratorResponse.File] = {
     file.getServices.asScala.flatMap { service =>
-      generateServiceFile(
-        file,
-        service,
-        fs2params.serviceSuffix + "Trailers",
-        di,
-        new Fs2GrpcExhaustiveTrailersServicePrinter(_, fs2params.serviceSuffix + "Trailers", di)
-      ) ::
+      val trailers =
+        if (fs2params.disableTrailers)
+          Nil
+        else
+          List(
+            generateServiceFile(
+              file,
+              service,
+              fs2params.serviceSuffix + "Trailers",
+              di,
+              new Fs2GrpcExhaustiveTrailersServicePrinter(_, fs2params.serviceSuffix + "Trailers", di)
+            )
+          )
+
+      val general =
         generateServiceFile(
           file,
           service,
           fs2params.serviceSuffix,
           di,
           new Fs2GrpcServicePrinter(_, fs2params.serviceSuffix, di)
-        ) :: Nil
+        )
+
+      trailers :+ general
     }.toSeq
   }
 
-  private def parseParameters(params: String): Either[String, (GeneratorParams, Fs2Params)] =
+  private def parseParameters(params: String): Either[String, (GeneratorParams, Fs2Params)] = {
+
+    def parseBoolean(param: String, value: String): Either[String, Boolean] =
+      if (value.equalsIgnoreCase("true"))
+        Right(true)
+      else if (value.equalsIgnoreCase("false"))
+        Right(false)
+      else
+        Left(s"Invalid value for $param: $value. It must be either true or false.")
+
     for {
       paramsAndUnparsed <- GeneratorParams.fromStringCollectUnrecognized(params)
       params = paramsAndUnparsed._1
       unparsed = paramsAndUnparsed._2
       suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(Fs2Params())) {
         case (Right(params), ServiceSuffix :: suffix :: Nil) => Right(params.copy(serviceSuffix = suffix))
+        case (Right(params), DisableTrailers :: value :: Nil) =>
+          parseBoolean(DisableTrailers, value).map(disabled => params.copy(disableTrailers = disabled))
         case (Right(_), xs) => Left(s"Unrecognized parameter: $xs")
         case (Left(e), _) => Left(e)
       }
     } yield (params, suffix)
+  }
 
   def process(request: CodeGenRequest): CodeGenResponse = {
     parseParameters(request.parameter) match {
@@ -111,4 +136,5 @@ object Fs2CodeGenerator extends CodeGenApp {
   }
 
   private[codegen] val ServiceSuffix: String = "serviceSuffix"
+  private[codegen] val DisableTrailers: String = "disableTrailers"
 }

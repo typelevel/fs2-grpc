@@ -161,14 +161,27 @@ lazy val e2e = (projectMatrix in file("e2e"))
         val output = (Compile / sourceManaged).value / "fs2-grpc" / "disable-trailers"
       }
 
+      val renderContextAsImplicit = new {
+        val args = Seq(
+          "fs2_grpc:service_suffix=Fs2GrpcRenderContextAsImplicit",
+          "fs2_grpc:render_context_as_implicit"
+        ) ++ (if (tlIsScala3.value) Seq("scala3_sources") else Nil)
+
+        val output = (Compile / sourceManaged).value / "fs2-grpc" / "render-context-as-implicit"
+      }
+
       Seq(
         scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
         genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc",
-        (genModule(codegenFullName + "$"), disableTrailers.args) -> disableTrailers.output
+        (genModule(codegenFullName + "$"), disableTrailers.args) -> disableTrailers.output,
+        (genModule(codegenFullName + "$"), renderContextAsImplicit.args) -> renderContextAsImplicit.output
       )
     },
     buildInfoPackage := "fs2.grpc.e2e.buildinfo",
-    buildInfoKeys := Seq[BuildInfoKey]("sourceManaged" -> (Compile / sourceManaged).value / "fs2-grpc"),
+    buildInfoKeys := Seq[BuildInfoKey](
+      "sourceManaged" -> (Compile / sourceManaged).value / "fs2-grpc",
+      "scalaVersion" -> scalaVersion.value
+    ),
     githubWorkflowArtifactUpload := false,
     scalacOptions := {
       if (tlIsScala3.value) {

@@ -32,6 +32,8 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
   val service: ServiceDescriptor
   val serviceSuffix: String
   val di: DescriptorImplicits
+  protected[this] val renderContextAsImplicit: Boolean = false
+  protected[this] val scala3Sources: Boolean = false
 
   import di._
 
@@ -53,6 +55,18 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
       s"$Stream.eval($basicClientCall)"
     else
       basicClientCall
+  }
+
+  protected[this] def renderCtxParameter(): String = {
+    if (renderContextAsImplicit) {
+      if (scala3Sources) {
+        s")(using ctx: $Ctx"
+      } else {
+        s")(implicit ctx: $Ctx"
+      }
+    } else {
+      s", ctx: $Ctx"
+    }
   }
 
   private[this] def serviceMethodImplementation(method: MethodDescriptor): PrinterEndo = { p =>
@@ -79,6 +93,15 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
     val handler = s"$Fs2ServerCallHandler[G](dispatcher, serverOptions).${handleMethod(method)}[$inType, $outType]"
 
     val serviceCall = s"serviceImpl.${method.name}"
+    val invoke = if (renderContextAsImplicit) {
+      if (scala3Sources) {
+        s"$serviceCall(r)(using m)"
+      } else {
+        s"$serviceCall(r)(m)"
+      }
+    } else {
+      s"$serviceCall(r, m)"
+    }
 
     p.addStringMargin {
       s"""|.addMethod(
@@ -87,7 +110,7 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
           |    serviceAspect.${visitMethod(method)}[$inType, $outType](
           |      ${ServiceCallContext}(m, $descriptor),
           |      r,
-          |      (r, m) => $serviceCall(r, m)
+          |      (r, m) => $invoke
           |    )
           |  }
           |)"""

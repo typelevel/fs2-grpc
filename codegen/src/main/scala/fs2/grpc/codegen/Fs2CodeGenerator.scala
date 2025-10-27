@@ -33,9 +33,13 @@ import scala.jdk.CollectionConverters.*
 sealed trait Fs2Params {
   def serviceSuffix: String
   def disableTrailers: Boolean
+  def renderContextAsImplicit: Boolean
+  def scala3Sources: Boolean
 
   def withServiceSuffix(serviceSuffix: String): Fs2Params
   def withDisableTrailers(value: Boolean): Fs2Params
+  def withRenderContextAsImplicit(value: Boolean): Fs2Params
+  def withScala3Sources(value: Boolean): Fs2Params
 }
 
 object Fs2Params {
@@ -43,18 +47,28 @@ object Fs2Params {
   def default: Fs2Params =
     Impl(
       serviceSuffix = "Fs2Grpc",
-      disableTrailers = false
+      disableTrailers = false,
+      renderContextAsImplicit = false,
+      scala3Sources = false
     )
 
   private final case class Impl(
       serviceSuffix: String,
-      disableTrailers: Boolean
+      disableTrailers: Boolean,
+      renderContextAsImplicit: Boolean,
+      scala3Sources: Boolean
   ) extends Fs2Params {
     def withServiceSuffix(serviceSuffix: String): Fs2Params =
       copy(serviceSuffix = serviceSuffix)
 
     def withDisableTrailers(value: Boolean): Fs2Params =
       copy(disableTrailers = value)
+
+    def withRenderContextAsImplicit(value: Boolean): Fs2Params =
+      copy(renderContextAsImplicit = value)
+
+    def withScala3Sources(value: Boolean): Fs2Params =
+      copy(scala3Sources = value)
   }
 }
 
@@ -92,7 +106,13 @@ object Fs2CodeGenerator extends CodeGenApp {
               service,
               fs2params.serviceSuffix + "Trailers",
               di,
-              new Fs2GrpcExhaustiveTrailersServicePrinter(_, fs2params.serviceSuffix + "Trailers", di)
+              new Fs2GrpcExhaustiveTrailersServicePrinter(
+                _,
+                fs2params.serviceSuffix + "Trailers",
+                fs2params.renderContextAsImplicit,
+                fs2params.scala3Sources,
+                di
+              )
             )
           )
 
@@ -102,7 +122,13 @@ object Fs2CodeGenerator extends CodeGenApp {
           service,
           fs2params.serviceSuffix,
           di,
-          new Fs2GrpcServicePrinter(_, fs2params.serviceSuffix, di)
+          new Fs2GrpcServicePrinter(
+            _,
+            fs2params.serviceSuffix,
+            fs2params.renderContextAsImplicit,
+            fs2params.scala3Sources,
+            di
+          )
         )
 
       trailers :+ general
@@ -114,9 +140,11 @@ object Fs2CodeGenerator extends CodeGenApp {
       paramsAndUnparsed <- GeneratorParams.fromStringCollectUnrecognized(params)
       params = paramsAndUnparsed._1
       unparsed = paramsAndUnparsed._2
-      suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(Fs2Params.default)) {
+      initial = Fs2Params.default.withScala3Sources(params.scala3Sources)
+      suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(initial)) {
         case (Right(params), ServiceSuffix :: suffix :: Nil) => Right(params.withServiceSuffix(suffix))
         case (Right(params), DisableTrailers :: Nil) => Right(params.withDisableTrailers(true))
+        case (Right(params), RenderContextAsImplicit :: Nil) => Right(params.withRenderContextAsImplicit(true))
         case (Right(_), ServiceSuffixPluginKey :: _ :: Nil) =>
           Left(s"The '$ServiceSuffixPluginKey' is replaced with '$ServiceSuffix'")
         case (Right(_), xs) => Left(s"Unrecognized parameter: $xs")
@@ -152,4 +180,5 @@ object Fs2CodeGenerator extends CodeGenApp {
   private[codegen] val ServiceSuffixPluginKey: String = "serviceSuffix"
   private[codegen] val ServiceSuffix: String = "fs2_grpc:service_suffix"
   private[codegen] val DisableTrailers: String = "fs2_grpc:disable_trailers"
+  private[codegen] val RenderContextAsImplicit: String = "fs2_grpc:render_context_as_implicit"
 }

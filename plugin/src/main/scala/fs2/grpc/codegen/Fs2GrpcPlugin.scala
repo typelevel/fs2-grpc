@@ -81,6 +81,22 @@ object Fs2GrpcPlugin extends AutoPlugin {
       case object Fs2GrpcDisableTrailers extends CodeGeneratorOption {
         override def toString: String = "fs2_grpc:disable_trailers"
       }
+
+      /** Renders context in the implicit position.
+        *
+        * Scala 2:
+        * {{{
+        *   def noStreaming(request: Req)(implicit ctx: A): F[Resp]
+        * }}}
+        *
+        * Scala 3, when `Scala3Sources` code generator is used:
+        * {{{
+        *   def noStreaming(request: Req)(using ctx: A): F[Resp]
+        * }}}
+        */
+      case object Fs2GrpcRenderContextAsImplicit extends CodeGeneratorOption {
+        override def toString: String = "fs2_grpc:render_context_as_implicit"
+      }
     }
 
     val scalapbCodeGeneratorOptions =

@@ -27,6 +27,8 @@ import scalapb.compiler.{DescriptorImplicits, StreamType}
 class Fs2GrpcExhaustiveTrailersServicePrinter(
     val service: ServiceDescriptor,
     val serviceSuffix: String,
+    override val renderContextAsImplicit: Boolean,
+    override val scala3Sources: Boolean,
     val di: DescriptorImplicits
 ) extends Fs2AbstractServicePrinter {
   import fs2.grpc.codegen.Fs2AbstractServicePrinter.constants._
@@ -36,13 +38,13 @@ class Fs2GrpcExhaustiveTrailersServicePrinter(
 
     val scalaInType = method.inputType.scalaType
     val scalaOutType = method.outputType.scalaType
-    val ctx = s"ctx: $Ctx"
+    val ctx = renderCtxParameter()
 
     s"def ${method.name}" + (method.streamType match {
-      case StreamType.Unary => s"(request: $scalaInType, $ctx): F[($scalaOutType, $Metadata)]"
-      case StreamType.ClientStreaming => s"(request: $Stream[F, $scalaInType], $ctx): F[($scalaOutType, $Metadata)]"
-      case StreamType.ServerStreaming => s"(request: $scalaInType, $ctx): $Stream[F, $scalaOutType]"
-      case StreamType.Bidirectional => s"(request: $Stream[F, $scalaInType], $ctx): $Stream[F, $scalaOutType]"
+      case StreamType.Unary => s"(request: $scalaInType$ctx): F[($scalaOutType, $Metadata)]"
+      case StreamType.ClientStreaming => s"(request: $Stream[F, $scalaInType]$ctx): F[($scalaOutType, $Metadata)]"
+      case StreamType.ServerStreaming => s"(request: $scalaInType$ctx): $Stream[F, $scalaOutType]"
+      case StreamType.Bidirectional => s"(request: $Stream[F, $scalaInType]$ctx): $Stream[F, $scalaOutType]"
     })
   }
 

@@ -1,0 +1,3 @@
+> compile
+$ exec bash -c 'grep -q "(using ctx: A)" target/scala-3.7.3/src_managed/main/fs2-grpc/hello/world/test_service/TestServiceFs2Grpc.scala || exit 1'
+$ exec bash -c 'grep -q "(using ctx: A)" target/scala-3.7.3/src_managed/main/fs2-grpc/hello/world/test_service/TestServiceFs2GrpcTrailers.scala || exit 1'

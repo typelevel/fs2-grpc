@@ -18,7 +18,7 @@ inThisBuild(
   List(
     githubWorkflowBuildSbtStepPreamble := Seq(),
     scalaVersion := Scala3,
-    tlBaseVersion := "2.12",
+    tlBaseVersion := "3.0",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organizationName := "Gary Coady / Fs2 Grpc Developers",
@@ -47,15 +47,7 @@ inThisBuild(
       ProblemFilters.exclude[MissingFieldProblem]("fs2.grpc.codegen.Fs2GrpcServicePrinter.constants"),
       // deleted private classes
       ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.client.Fs2UnaryClientCallListener*"),
-      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*"),
-      // Fs2Params is replaced with a sealed trait
-      ProblemFilters.exclude[IncompatibleTemplateDefProblem]("fs2.grpc.codegen.Fs2Params"),
-      ProblemFilters.exclude[MissingTypesProblem]("fs2.grpc.codegen.Fs2Params$"),
-      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.<init>$default$1"),
-      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.apply"),
-      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.apply$default$1"),
-      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.unapply"),
-      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.codegen.Fs2Params.fromProduct")
+      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*")
     )
   )
 )

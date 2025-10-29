@@ -70,6 +70,10 @@ object Fs2GrpcPlugin extends AutoPlugin {
       case object Scala3Sources extends CodeGeneratorOption {
         override def toString: String = "scala3_sources"
       }
+      // Disable generation of the trailers
+      case object Fs2GrpcDisableTrailers extends CodeGeneratorOption {
+        override def toString: String = "fs2_grpc:disable_trailers"
+      }
     }
 
     val scalapbCodeGeneratorOptions =

@@ -30,7 +30,33 @@ import scalapb.options.Scalapb
 
 import scala.jdk.CollectionConverters.*
 
-final case class Fs2Params(serviceSuffix: String = "Fs2Grpc")
+sealed trait Fs2Params {
+  def serviceSuffix: String
+  def disableTrailers: Boolean
+
+  def withServiceSuffix(serviceSuffix: String): Fs2Params
+  def withDisableTrailers(value: Boolean): Fs2Params
+}
+
+object Fs2Params {
+
+  def default: Fs2Params =
+    Impl(
+      serviceSuffix = "Fs2Grpc",
+      disableTrailers = false
+    )
+
+  private final case class Impl(
+      serviceSuffix: String,
+      disableTrailers: Boolean
+  ) extends Fs2Params {
+    def withServiceSuffix(serviceSuffix: String): Fs2Params =
+      copy(serviceSuffix = serviceSuffix)
+
+    def withDisableTrailers(value: Boolean): Fs2Params =
+      copy(disableTrailers = value)
+  }
+}
 
 object Fs2CodeGenerator extends CodeGenApp {
 
@@ -56,20 +82,30 @@ object Fs2CodeGenerator extends CodeGenApp {
       di: DescriptorImplicits
   ): Seq[PluginProtos.CodeGeneratorResponse.File] = {
     file.getServices.asScala.flatMap { service =>
-      generateServiceFile(
-        file,
-        service,
-        fs2params.serviceSuffix + "Trailers",
-        di,
-        new Fs2GrpcExhaustiveTrailersServicePrinter(_, fs2params.serviceSuffix + "Trailers", di)
-      ) ::
+      val trailers =
+        if (fs2params.disableTrailers)
+          Nil
+        else
+          List(
+            generateServiceFile(
+              file,
+              service,
+              fs2params.serviceSuffix + "Trailers",
+              di,
+              new Fs2GrpcExhaustiveTrailersServicePrinter(_, fs2params.serviceSuffix + "Trailers", di)
+            )
+          )
+
+      val general =
         generateServiceFile(
           file,
           service,
           fs2params.serviceSuffix,
           di,
           new Fs2GrpcServicePrinter(_, fs2params.serviceSuffix, di)
-        ) :: Nil
+        )
+
+      trailers :+ general
     }.toSeq
   }
 
@@ -78,8 +114,9 @@ object Fs2CodeGenerator extends CodeGenApp {
       paramsAndUnparsed <- GeneratorParams.fromStringCollectUnrecognized(params)
       params = paramsAndUnparsed._1
       unparsed = paramsAndUnparsed._2
-      suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(Fs2Params())) {
-        case (Right(params), ServiceSuffix :: suffix :: Nil) => Right(params.copy(serviceSuffix = suffix))
+      suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(Fs2Params.default)) {
+        case (Right(params), ServiceSuffix :: suffix :: Nil) => Right(params.withServiceSuffix(suffix))
+        case (Right(params), DisableTrailers :: Nil) => Right(params.withDisableTrailers(true))
         case (Right(_), xs) => Left(s"Unrecognized parameter: $xs")
         case (Left(e), _) => Left(e)
       }
@@ -111,4 +148,5 @@ object Fs2CodeGenerator extends CodeGenApp {
   }
 
   private[codegen] val ServiceSuffix: String = "serviceSuffix"
+  private[codegen] val DisableTrailers: String = "fs2_grpc:disable_trailers"
 }

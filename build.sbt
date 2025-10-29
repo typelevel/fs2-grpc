@@ -18,7 +18,7 @@ inThisBuild(
   List(
     githubWorkflowBuildSbtStepPreamble := Seq(),
     scalaVersion := Scala3,
-    tlBaseVersion := "2.11",
+    tlBaseVersion := "3.0",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organizationName := "Gary Coady / Fs2 Grpc Developers",
@@ -146,10 +146,18 @@ lazy val e2e = (projectMatrix in file("e2e"))
       ceMunit % Test,
       "io.grpc" % "grpc-inprocess" % versions.grpc % Test
     ),
-    Compile / PB.targets := Seq(
-      scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
-      genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc"
-    ),
+    Compile / PB.targets := {
+      val disableTrailers = new {
+        val args = Seq("serviceSuffix=Fs2GrpcDisableTrailers", "fs2_grpc:disable_trailers")
+        val output = (Compile / sourceManaged).value / "fs2-grpc" / "disable-trailers"
+      }
+
+      Seq(
+        scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
+        genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc",
+        (genModule(codegenFullName + "$"), disableTrailers.args) -> disableTrailers.output
+      )
+    },
     buildInfoPackage := "fs2.grpc.e2e.buildinfo",
     buildInfoKeys := Seq[BuildInfoKey]("sourceManaged" -> (Compile / sourceManaged).value / "fs2-grpc"),
     githubWorkflowArtifactUpload := false,

@@ -109,29 +109,18 @@ object Fs2CodeGenerator extends CodeGenApp {
     }.toSeq
   }
 
-  private def parseParameters(params: String): Either[String, (GeneratorParams, Fs2Params)] = {
-
-    def parseBoolean(param: String, value: String): Either[String, Boolean] =
-      if (value.equalsIgnoreCase("true"))
-        Right(true)
-      else if (value.equalsIgnoreCase("false"))
-        Right(false)
-      else
-        Left(s"Invalid value for $param: $value. It must be either true or false.")
-
+  private def parseParameters(params: String): Either[String, (GeneratorParams, Fs2Params)] =
     for {
       paramsAndUnparsed <- GeneratorParams.fromStringCollectUnrecognized(params)
       params = paramsAndUnparsed._1
       unparsed = paramsAndUnparsed._2
       suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(Fs2Params.default)) {
         case (Right(params), ServiceSuffix :: suffix :: Nil) => Right(params.withServiceSuffix(suffix))
-        case (Right(params), DisableTrailers :: value :: Nil) =>
-          parseBoolean(DisableTrailers, value).map(params.withDisableTrailers)
+        case (Right(params), DisableTrailers :: Nil) => Right(params.withDisableTrailers(true))
         case (Right(_), xs) => Left(s"Unrecognized parameter: $xs")
         case (Left(e), _) => Left(e)
       }
     } yield (params, suffix)
-  }
 
   def process(request: CodeGenRequest): CodeGenResponse = {
     parseParameters(request.parameter) match {
@@ -159,5 +148,5 @@ object Fs2CodeGenerator extends CodeGenApp {
   }
 
   private[codegen] val ServiceSuffix: String = "serviceSuffix"
-  private[codegen] val DisableTrailers: String = "disableTrailers"
+  private[codegen] val DisableTrailers: String = "fs2_grpc:disable_trailers"
 }

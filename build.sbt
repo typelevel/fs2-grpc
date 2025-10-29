@@ -148,7 +148,7 @@ lazy val e2e = (projectMatrix in file("e2e"))
     ),
     Compile / PB.targets := {
       val disableTrailers = new {
-        val args = Seq("serviceSuffix=Fs2GrpcDisableTrailers", "disableTrailers=true")
+        val args = Seq("serviceSuffix=Fs2GrpcDisableTrailers", "fs2_grpc:disable_trailers")
         val output = (Compile / sourceManaged).value / "fs2-grpc" / "disable-trailers"
       }
 

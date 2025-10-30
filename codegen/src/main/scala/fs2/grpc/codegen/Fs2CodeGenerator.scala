@@ -117,6 +117,8 @@ object Fs2CodeGenerator extends CodeGenApp {
       suffix <- unparsed.map(_.split("=", 2).toList).foldLeft[Either[String, Fs2Params]](Right(Fs2Params.default)) {
         case (Right(params), ServiceSuffix :: suffix :: Nil) => Right(params.withServiceSuffix(suffix))
         case (Right(params), DisableTrailers :: Nil) => Right(params.withDisableTrailers(true))
+        case (Right(_), ServiceSuffixPluginKey :: _ :: Nil) =>
+          Left(s"The '$ServiceSuffixPluginKey' is replaced with '$ServiceSuffix'")
         case (Right(_), xs) => Left(s"Unrecognized parameter: $xs")
         case (Left(e), _) => Left(e)
       }
@@ -147,6 +149,7 @@ object Fs2CodeGenerator extends CodeGenApp {
     process(CodeGenRequest(request)).toCodeGeneratorResponse
   }
 
-  private[codegen] val ServiceSuffix: String = "serviceSuffix"
+  private[codegen] val ServiceSuffixPluginKey: String = "serviceSuffix"
+  private[codegen] val ServiceSuffix: String = "fs2_grpc:service_suffix"
   private[codegen] val DisableTrailers: String = "fs2_grpc:disable_trailers"
 }

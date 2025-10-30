@@ -77,12 +77,11 @@ lazy val codegenFullName =
   "fs2.grpc.codegen.Fs2CodeGenerator"
 
 lazy val plugin = project
-  .enablePlugins(BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin, SbtPlugin)
   .settings(
     name := "sbt-fs2-grpc",
     scalaVersion := Scala212,
     tlVersionIntroduced := Map("2.12" -> "2.5.3"),
-    sbtPlugin := true,
     mimaFailOnNoPrevious := false,
     mimaPreviousArtifacts := Set(),
     buildInfoPackage := "fs2.grpc.buildinfo",
@@ -98,7 +97,17 @@ lazy val plugin = project
       "runtimeName" -> (runtime.jvm(Scala212) / name).value
     ),
     libraryDependencies += scalaPbCompiler,
-    addSbtPlugin(sbtProtoc)
+    addSbtPlugin(sbtProtoc),
+    scriptedBufferLog := false,
+    scriptedLaunchOpts ++= Seq("-Xmx1024M", "-Dplugin.version=" + version.value),
+    scriptedDependencies := scriptedDependencies
+      .dependsOn(Def.taskDyn(runtime.jvm(Scala3) / publishLocal))
+      .dependsOn(Def.taskDyn(codegen.jvm(Scala212) / publishLocal))
+      .value,
+    test := {
+      (Test / test).value
+      scripted.toTask("").value
+    }
   )
 
 lazy val runtime = (projectMatrix in file("runtime"))
@@ -148,7 +157,7 @@ lazy val e2e = (projectMatrix in file("e2e"))
     ),
     Compile / PB.targets := {
       val disableTrailers = new {
-        val args = Seq("serviceSuffix=Fs2GrpcDisableTrailers", "fs2_grpc:disable_trailers")
+        val args = Seq("fs2_grpc:service_suffix=Fs2GrpcDisableTrailers", "fs2_grpc:disable_trailers")
         val output = (Compile / sourceManaged).value / "fs2-grpc" / "disable-trailers"
       }
 

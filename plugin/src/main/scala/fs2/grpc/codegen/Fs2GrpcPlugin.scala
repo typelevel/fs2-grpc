@@ -70,6 +70,13 @@ object Fs2GrpcPlugin extends AutoPlugin {
       case object Scala3Sources extends CodeGeneratorOption {
         override def toString: String = "scala3_sources"
       }
+
+      /** Suffix used for generated service, e.g. service `Foo` with suffix `Fs2Grpc` results in `FooFs2Grpc`
+        */
+      case class Fs2GrpcServiceSuffix(suffix: String) extends CodeGeneratorOption {
+        override def toString: String = s"fs2_grpc:service_suffix=$suffix"
+      }
+
       // Disable generation of the trailers
       case object Fs2GrpcDisableTrailers extends CodeGeneratorOption {
         override def toString: String = "fs2_grpc:disable_trailers"
@@ -85,6 +92,10 @@ object Fs2GrpcPlugin extends AutoPlugin {
     val scalapbCodeGenerators =
       settingKey[Seq[Target]]("Code generators for scalapb")
 
+    @deprecated(
+      """Use `scalapbCodeGeneratorOptions += CodeGeneratorOption.Fs2GrpcServiceSuffix("Suffix")`""",
+      "3.0"
+    )
     val fs2GrpcServiceSuffix =
       settingKey[String](
         "Suffix used for generated service, e.g. service `Foo` with suffix `Fs2Grpc` results in `FooFs2Grpc`"
@@ -112,6 +123,7 @@ object Fs2GrpcPlugin extends AutoPlugin {
 
   private def codegenScalaBinaryVersion = CrossVersion.binaryScalaVersion(BuildInfo.scalaVersion)
 
+  @annotation.nowarn("cat=deprecation")
   override def projectSettings: Seq[Def.Setting[_]] =
     List(
       fs2GrpcServiceSuffix := "Fs2Grpc",
@@ -135,14 +147,17 @@ object Fs2GrpcPlugin extends AutoPlugin {
                   BuildInfo.codeGeneratorFullName + "$",
                   Nil
                 ),
-                scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString) :+
-                  s"serviceSuffix=${fs2GrpcServiceSuffix.value}"
+                scalapbCodeGeneratorOptions.value.filterNot(_ == CodeGeneratorOption.Fs2Grpc).map(_.toString)
               ),
               fs2GrpcOutputPath.value
             )
           ).filter(_ => scalapbCodeGeneratorOptions.value.contains(CodeGeneratorOption.Fs2Grpc)).toList
       },
-      scalapbCodeGeneratorOptions := Seq(CodeGeneratorOption.Grpc, CodeGeneratorOption.Fs2Grpc),
+      scalapbCodeGeneratorOptions := Seq(
+        CodeGeneratorOption.Grpc,
+        CodeGeneratorOption.Fs2Grpc,
+        CodeGeneratorOption.Fs2GrpcServiceSuffix(fs2GrpcServiceSuffix.value)
+      ),
       libraryDependencies ++= List(
         "io.grpc" % "grpc-core" % BuildInfo.grpcVersion,
         "io.grpc" % "grpc-stub" % BuildInfo.grpcVersion,

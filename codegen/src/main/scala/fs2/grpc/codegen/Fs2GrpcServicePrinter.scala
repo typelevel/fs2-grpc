@@ -24,8 +24,13 @@ package fs2.grpc.codegen
 import com.google.protobuf.Descriptors.{MethodDescriptor, ServiceDescriptor}
 import scalapb.compiler.{DescriptorImplicits, StreamType}
 
-class Fs2GrpcServicePrinter(val service: ServiceDescriptor, val serviceSuffix: String, val di: DescriptorImplicits)
-    extends Fs2AbstractServicePrinter {
+class Fs2GrpcServicePrinter(
+    val service: ServiceDescriptor,
+    val serviceSuffix: String,
+    override val renderContextAsImplicit: Boolean,
+    override val scala3Sources: Boolean,
+    val di: DescriptorImplicits
+) extends Fs2AbstractServicePrinter {
   import fs2.grpc.codegen.Fs2AbstractServicePrinter.constants._
   import di._
 
@@ -33,13 +38,13 @@ class Fs2GrpcServicePrinter(val service: ServiceDescriptor, val serviceSuffix: S
 
     val scalaInType = method.inputType.scalaType
     val scalaOutType = method.outputType.scalaType
-    val ctx = s"ctx: $Ctx"
+    val ctx = renderCtxParameter()
 
     s"def ${method.name}" + (method.streamType match {
-      case StreamType.Unary => s"(request: $scalaInType, $ctx): F[$scalaOutType]"
-      case StreamType.ClientStreaming => s"(request: $Stream[F, $scalaInType], $ctx): F[$scalaOutType]"
-      case StreamType.ServerStreaming => s"(request: $scalaInType, $ctx): $Stream[F, $scalaOutType]"
-      case StreamType.Bidirectional => s"(request: $Stream[F, $scalaInType], $ctx): $Stream[F, $scalaOutType]"
+      case StreamType.Unary => s"(request: $scalaInType$ctx): F[$scalaOutType]"
+      case StreamType.ClientStreaming => s"(request: $Stream[F, $scalaInType]$ctx): F[$scalaOutType]"
+      case StreamType.ServerStreaming => s"(request: $scalaInType$ctx): $Stream[F, $scalaOutType]"
+      case StreamType.Bidirectional => s"(request: $Stream[F, $scalaInType]$ctx): $Stream[F, $scalaOutType]"
     })
   }
 

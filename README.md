@@ -117,8 +117,8 @@ The full set of options available are:
  - `CodeGeneratorOption.SingleLineToProtoString` - `toProtoString` generates single line
  - `CodeGeneratorOption.AsciiFormatToString` - `toString` uses `toProtoString` functionality
  - `CodeGeneratorOption.Fs2GrpcServiceSuffix` - suffix used for generated service, e.g. service `Foo` with suffix `Fs2Grpc` results in `FooFs2Grpc`
- - `CodeGeneratorOption.Fs2GrpcDisableTrailers` - disable generation of the trailers
- - `CodeGeneratorOption.Fs2GrpcRenderContextAsImplicit` - renders context in the implicit position
+ - `CodeGeneratorOption.Fs2GrpcDisableTrailers` - disable generation of trailers
+ - `CodeGeneratorOption.Fs2GrpcRenderContextAsImplicit` - renders context in implicit position
 
 ## Pass additional protoc options
 

@@ -23,38 +23,38 @@ package fs2
 package grpc
 package shared
 
-import cats.implicits._
-import cats.effect.Concurrent
-import cats.effect.std.Queue
+import cats.implicits.*
+import cats.effect.Async
+import cats.effect.std.{Queue, unsafe}
 
 private[grpc] trait StreamIngest[F[_], T] {
-  def onMessage(msg: T): F[Unit]
-  def onClose(error: Option[Throwable]): F[Unit]
+  def unsafeOnMessage(msg: T): Unit
+  def unsafeOnClose(error: Option[Throwable]): Unit
   def messages: Stream[F, T]
 }
 
 private[grpc] object StreamIngest {
 
-  def apply[F[_]: Concurrent, T](
+  def apply[F[_]: Async, T](
       request: Int => F[Unit],
       prefetchN: Int
   ): F[StreamIngest[F, T]] =
     Queue
-      .unbounded[F, Either[Option[Throwable], T]]
+      .unsafeUnbounded[F, Either[Option[Throwable], T]]
       .map(q => create[F, T](request, prefetchN, q))
 
   def create[F[_], T](
       request: Int => F[Unit],
       prefetchN: Int,
-      queue: Queue[F, Either[Option[Throwable], T]]
-  )(implicit F: Concurrent[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
+      queue: unsafe.UnboundedQueue[F, Either[Option[Throwable], T]]
+  )(implicit F: Async[F]): StreamIngest[F, T] = new StreamIngest[F, T] {
     private val limit: Int = math.max(1, prefetchN)
 
-    def onMessage(msg: T): F[Unit] =
-      queue.offer(msg.asRight)
+    def unsafeOnMessage(msg: T): Unit =
+      queue.unsafeOffer(msg.asRight)
 
-    def onClose(error: Option[Throwable]): F[Unit] =
-      queue.offer(error.asLeft)
+    def unsafeOnClose(error: Option[Throwable]): Unit =
+      queue.unsafeOffer(error.asLeft)
 
     val messages: Stream[F, T] = {
       type Requested = Int

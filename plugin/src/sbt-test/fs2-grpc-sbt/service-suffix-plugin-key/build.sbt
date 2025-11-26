@@ -4,5 +4,5 @@ lazy val root = project
   .settings(
     scalaVersion := "3.7.3",
     scalapbCodeGeneratorOptions += CodeGeneratorOption.Scala3Sources,
-    scalapbCodeGeneratorOptions += CodeGeneratorOption.Fs2GrpcServiceSuffix("SomeSuffix"),
+    scalapbCodeGeneratorOptions += CodeGeneratorOption.Fs2GrpcServiceSuffix("SomeSuffix")
   )

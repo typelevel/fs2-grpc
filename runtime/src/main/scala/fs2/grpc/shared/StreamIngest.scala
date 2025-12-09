@@ -35,6 +35,69 @@ private[grpc] trait StreamIngest[F[_], T] {
 
 private[grpc] object StreamIngest {
 
+  // Minimum value of `prefetchN` parameter to use
+  // internal buffering of incoming messages in `StreamIngest`
+  val BufferingThreshold = 14 // 12 + 4 + 14 * 8 = 128 bytes for compressed pointers
+
+  sealed trait State[+T]
+  final case class Done(opt: Option[Throwable]) extends State[Nothing]
+
+  sealed trait Buffering[+T] extends State[T] {
+    def requested: Int
+
+    def append[T2 >: T](value: T2): (Option[Chunk[T2]], Buffering[T2])
+
+    def requestForMore(): Option[(Int, Buffering[T])]
+    def split(): Option[(Chunk[T], Buffering[T])]
+
+    protected def receivedOne: Int = math.max(0, requested - 1)
+  }
+  final case class ChunkBuffer[+T](requested: Int, limit: Int, chunk: Chunk[T]) extends Buffering[T] {
+    def append[T2 >: T](value: T2): (Option[Chunk[T2]], Buffering[T2]) = {
+      val updChunk = chunk ++ Chunk.singleton(value)
+
+      if (updChunk.size < limit) (none, copy(requested = receivedOne, chunk = updChunk))
+      else (updChunk.toIndexedChunk.some, copy(requested = receivedOne, chunk = Chunk.empty))
+    }
+
+    def requestForMore(): Option[(Int, Buffering[T])] = {
+      val additional = limit - requested
+      if (additional <= 0) none
+      else (additional, copy(requested = requested + additional)).some
+    }
+
+    def split(): Option[(Chunk[T], Buffering[T])] =
+      if (chunk.isEmpty) none
+      else (chunk.toIndexedChunk, copy(chunk = Chunk.empty[T])).some
+  }
+  final case class ArrayBuffer[+T](requested: Int, array: Array[AnyRef], offset: Int, count: Int) extends Buffering[T] {
+    private def chunk(length: Int): Chunk[T] = Chunk.array(array, offset, length).asInstanceOf[Chunk[T]]
+
+    def append[T2 >: T](value: T2): (Option[Chunk[T2]], Buffering[T2]) = {
+      array(offset + count) = value.asInstanceOf[AnyRef]
+      val updCount = count + 1
+
+      if (offset + updCount < array.length) (none, copy(requested = receivedOne, count = updCount))
+      else (chunk(updCount).some, copy(receivedOne, new Array[AnyRef](array.length), 0, 0))
+    }
+
+    def requestForMore(): Option[(Int, Buffering[T])] = {
+      val additional = array.length - requested
+      if (additional <= 0) none
+      else (additional, copy(requested = requested + additional)).some
+    }
+
+    def split(): Option[(Chunk[T], Buffering[T])] =
+      if (count == 0) none
+      else (chunk(count), copy(offset = offset + count, count = 0)).some
+  }
+
+  object State {
+    def apply[T](limit: Int): State[T] =
+      if (limit < BufferingThreshold) ChunkBuffer(0, limit, Chunk.empty[T])
+      else ArrayBuffer(0, new Array[AnyRef](limit), 0, 0)
+  }
+
   def apply[F[_]: Concurrent, T](
       request: Int => F[Unit],
       prefetchN: Int
@@ -57,60 +120,43 @@ private[grpc] object StreamIngest {
       queue.offer(error.asLeft)
 
     val messages: Stream[F, T] = {
-      type Requested = Int
-      type Offset = Int
-      type Count = Int
-      type S = Either[Option[Throwable], (Requested, Array[AnyRef], Offset, Count)]
+      def loop(state: State[T]): F[Option[(Chunk[T], State[T])]] = state match {
+        case Done(None) => F.pure(none)
+        case Done(Some(err)) => F.raiseError(err)
+        case buf: Buffering[T] =>
+          def requestIfNeeded: F[Buffering[T]] = buf.requestForMore() match {
+            case Some((adds, buf)) => request(adds).as(buf)
+            case None => F.pure(buf)
+          }
 
-      def receivedOne(requested: Requested): Requested = math.max(0, requested - 1)
-      def requestIfNeeded(requested: Requested): F[Requested] = {
-        val additional = math.max(0, limit - requested)
-        request(additional).whenA(additional > 0).as(requested + additional)
-      }
-
-      def zero(requested: Requested): F[S] = F.unit.map { _ =>
-        (requested, new Array[AnyRef](prefetchN), 0, 0).asRight
-      }
-
-      def loop(state: S): F[Option[(Chunk[T], S)]] =
-        state match {
-          case Left(None) => F.pure(none)
-          case Left(Some(err)) => F.raiseError(err)
-          case Right((requested, buf, offset, count)) =>
-            def chunk(count: Count): Chunk[T] =
-              Chunk.array(buf, offset, count).asInstanceOf[Chunk[T]]
-
-            def bufferAndMaybeEmit(value: T): F[Option[(Chunk[T], S)]] = {
-              buf(offset + count) = value.asInstanceOf[AnyRef]
-
-              val updCount = count + 1
-              val updRequested = receivedOne(requested)
-
-              if (offset + updCount < buf.length) loop((updRequested, buf, offset, updCount).asRight)
-              else zero(updRequested).map(z => (chunk(updCount), z).some)
+          def bufferOrEmit(buf: Buffering[T], value: T): F[Option[(Chunk[T], State[T])]] =
+            buf.append(value) match {
+              case (Some(chunk), buf) => F.pure((chunk, buf).some)
+              case (None, buf) => loop(buf)
             }
 
-            queue.tryTake.flatMap {
-              case Some(Right(value)) => bufferAndMaybeEmit(value)
-              case Some(Left(err)) =>
-                if (count == 0) loop(err.asLeft)
-                else F.pure((chunk(count), err.asLeft).some)
-              case None =>
-                def await(requested: Requested): F[Option[(Chunk[T], S)]] = {
-                  if (count != 0) F.pure((chunk(count), (requested, buf, offset + count, 0).asRight).some)
-                  else
-                    queue.take.flatMap {
-                      case Right(value) => bufferAndMaybeEmit(value)
-                      case Left(err) => loop(err.asLeft)
-                    }
-                }
+          def waitOrEmit(buf: Buffering[T]): F[Option[(Chunk[T], State[T])]] = buf.split() match {
+            case some: Some[_] => F.pure(some)
+            case None =>
+              queue.take.flatMap {
+                case Right(value) => bufferOrEmit(buf, value)
+                case Left(opt) => loop(Done(opt))
+              }
+          }
 
-                requestIfNeeded(requested) >>= await
-            }
-        }
+          queue.tryTake.flatMap {
+            case None => requestIfNeeded >>= waitOrEmit
+            case Some(Right(value)) => bufferOrEmit(buf, value)
+            case Some(Left(err)) =>
+              buf.split() match {
+                case Some((chunk, _)) => F.pure((chunk, Done(err)).some)
+                case None => loop(Done(err))
+              }
+          }
+      }
 
-      Stream.eval(zero(0)).flatMap { z =>
-        Stream.unfoldChunkEval[F, S, T](z)(loop)
+      Stream.eval(F.pure(limit).map(State(_))).flatMap { z =>
+        Stream.unfoldChunkEval[F, State[T], T](z)(loop)
       }
     }
   }

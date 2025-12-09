@@ -58,38 +58,60 @@ private[grpc] object StreamIngest {
 
     val messages: Stream[F, T] = {
       type Requested = Int
-      type S = Either[Option[Throwable], (Requested, Chunk[T])]
+      type Offset = Int
+      type Count = Int
+      type S = Either[Option[Throwable], (Requested, Array[AnyRef], Offset, Count)]
+
       def receivedOne(requested: Requested): Requested = math.max(0, requested - 1)
       def requestIfNeeded(requested: Requested): F[Requested] = {
         val additional = math.max(0, limit - requested)
         request(additional).whenA(additional > 0).as(requested + additional)
       }
 
-      def zero(requested: Requested): S = (requested, Chunk.empty).asRight
+      def zero(requested: Requested): F[S] = F.unit.map { _ =>
+        (requested, new Array[AnyRef](prefetchN), 0, 0).asRight
+      }
 
       def loop(state: S): F[Option[(Chunk[T], S)]] =
         state match {
           case Left(None) => F.pure(none)
           case Left(Some(err)) => F.raiseError(err)
-          case Right((requested, acc)) =>
+          case Right((requested, buf, offset, count)) =>
+            def chunk(count: Count): Chunk[T] =
+              Chunk.array(buf, offset, count).asInstanceOf[Chunk[T]]
+
+            def bufferAndMaybeEmit(value: T): F[Option[(Chunk[T], S)]] = {
+              buf(offset + count) = value.asInstanceOf[AnyRef]
+
+              val updCount = count + 1
+              val updRequested = receivedOne(requested)
+
+              if (offset + updCount < buf.length) loop((updRequested, buf, offset, updCount).asRight)
+              else zero(updRequested).map(z => (chunk(updCount), z).some)
+            }
+
             queue.tryTake.flatMap {
-              case Some(Right(value)) => loop((receivedOne(requested), (acc ++ Chunk.singleton(value))).asRight)
+              case Some(Right(value)) => bufferAndMaybeEmit(value)
               case Some(Left(err)) =>
-                if (acc.isEmpty) loop(err.asLeft)
-                else F.pure((acc.toIndexedChunk, err.asLeft).some)
+                if (count == 0) loop(err.asLeft)
+                else F.pure((chunk(count), err.asLeft).some)
               case None =>
-                def await(requested: Requested) = if (acc.isEmpty) queue.take.flatMap {
-                  case Right(value) =>
-                    loop((receivedOne(requested), Chunk.singleton(value)).asRight)
-                  case Left(err) => loop(err.asLeft)
+                def await(requested: Requested): F[Option[(Chunk[T], S)]] = {
+                  if (count != 0) F.pure((chunk(count), (requested, buf, offset + count, 0).asRight).some)
+                  else
+                    queue.take.flatMap {
+                      case Right(value) => bufferAndMaybeEmit(value)
+                      case Left(err) => loop(err.asLeft)
+                    }
                 }
-                else F.pure((acc.toIndexedChunk, zero(requested)).some)
 
                 requestIfNeeded(requested) >>= await
             }
         }
 
-      Stream.unfoldChunkEval[F, S, T](zero(0))(loop)
+      Stream.eval(zero(0)).flatMap { z =>
+        Stream.unfoldChunkEval[F, S, T](z)(loop)
+      }
     }
   }
 

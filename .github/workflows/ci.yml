@@ -87,11 +87,11 @@ jobs:
 
       - name: Make target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
-        run: mkdir -p plugin/target runtime/target/jvm-2.12 codegen/target/jvm-3 codegen/target/jvm-2.13 runtime/target/jvm-3 codegen/target/jvm-2.12 runtime/target/jvm-2.13 project/target
+        run: mkdir -p plugin/target runtime/target/jvm-2.12 codegen/target/jvm-3 codegen/target/jvm-2.12 runtime/target/jvm-3 project/target
 
       - name: Compress target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
-        run: tar cf targets.tar plugin/target runtime/target/jvm-2.12 codegen/target/jvm-3 codegen/target/jvm-2.13 runtime/target/jvm-3 codegen/target/jvm-2.12 runtime/target/jvm-2.13 project/target
+        run: tar cf targets.tar plugin/target runtime/target/jvm-2.12 codegen/target/jvm-3 codegen/target/jvm-2.12 runtime/target/jvm-3 project/target
 
       - name: Upload target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
@@ -224,7 +224,7 @@ jobs:
       - name: Submit Dependencies
         uses: scalacenter/sbt-dependency-submission@v2
         with:
-          modules-ignore: root_3 e2e_2.12 e2e_3 e2e_2.13
+          modules-ignore: root_3 e2e_2.12 e2e_3
           configs-ignore: test scala-tool scala-doc-tool test-internal
 
   validate-steward:

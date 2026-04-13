@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package hello.world;
+
+// TestService: Example gRPC service used in e2e tests
+// It demonstrates all four RPC shapes.
+service TestService {
+  // Unary RPC: no streaming in either direction
+  rpc noStreaming (TestRequest) returns (TestResponse);
+  // Client streaming RPC: client streams, server returns a single response
+  rpc clientStreaming (stream TestRequest) returns (TestResponse);
+  // Server streaming RPC: client sends one request, server streams responses
+  rpc serverStreaming (TestRequest) returns (stream TestResponse);
+  // Bidirectional streaming RPC: both client and server stream
+  rpc bothStreaming (stream TestRequest) returns (stream TestResponse);
+}
+
+message TestRequest {}
+message TestResponse {}

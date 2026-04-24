@@ -53,7 +53,8 @@ inThisBuild(
 )
 
 lazy val projects =
-  runtime.projectRefs ++ codegen.projectRefs ++ e2e.projectRefs ++ List(plugin.project, protocGen.agg.project)
+  runtime.projectRefs ++ otel4sTrace.projectRefs ++ codegen.projectRefs ++ e2e.projectRefs ++ e2eOtel4s.projectRefs ++
+    List(plugin.project, protocGen.agg.project)
 
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin, NoPublishPlugin)
@@ -112,6 +113,7 @@ lazy val plugin = project
 
 lazy val runtime = (projectMatrix in file("runtime"))
   .defaultAxes(axesDefault: _*)
+  .enablePlugins(BuildInfoPlugin)
   .settings(
     name := "fs2-grpc-runtime",
     tlVersionIntroduced := Map("2.12" -> "2.5.3", "2.13" -> "2.5.3", "3" -> "2.5.3"),
@@ -124,9 +126,31 @@ lazy val runtime = (projectMatrix in file("runtime"))
     scalacOptions ++= {
       if (tlIsScala3.value) { Seq("-language:implicitConversions", "-Ykind-projector", "-source:3.0-migration") }
       else Seq.empty
-    }
+    },
+    buildInfoPackage := "fs2.grpc",
+    buildInfoKeys := Seq[BuildInfoKey](version),
+    buildInfoOptions += BuildInfoOption.PackagePrivate
   )
   .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
+
+lazy val otel4sTrace = (projectMatrix in file("otel4s-trace"))
+  .dependsOn(runtime)
+  .defaultAxes(axesDefault: _*)
+  .settings(
+    name := "fs2-grpc-otel4s-trace",
+    tlVersionIntroduced := Map("2.13" -> "3.1.0", "3" -> "3.1.0"),
+    libraryDependencies ++= List(otel4sCoreTrace, otel4sSemconv) ++ List(grpcNetty, ceTestkit, ceMunit).map(_ % Test),
+    Test / parallelExecution := false,
+    scalacOptions := {
+      if (tlIsScala3.value) { scalacOptions.value.filterNot(_ == "-Ykind-projector:underscores") }
+      else scalacOptions.value
+    },
+    scalacOptions ++= {
+      if (tlIsScala3.value) { Seq("-language:implicitConversions", "-Ykind-projector", "-source:3.0-migration") }
+      else Seq.empty
+    }
+  )
+  .jvmPlatform(scalaVersions = Seq(Scala213, Scala3))
 
 lazy val codeGenJVM212 = codegen.jvm(Scala212)
 lazy val protocGen = protocGenProject("protoc-gen-fs2-grpc", codeGenJVM212)
@@ -194,3 +218,36 @@ lazy val e2e = (projectMatrix in file("e2e"))
     }
   )
   .jvmPlatform(scalaVersions = Seq(Scala212, Scala213, Scala3))
+
+lazy val e2eOtel4s = (projectMatrix in file("e2e-otel4s"))
+  .dependsOn(runtime, otel4sTrace)
+  .defaultAxes(axesDefault: _*)
+  .enablePlugins(LocalCodeGenPlugin, NoPublishPlugin)
+  .settings(
+    codeGenClasspath := (codeGenJVM212 / Compile / fullClasspath).value,
+    libraryDependencies := Nil,
+    libraryDependencies ++= List(
+      scalaPbGrpcRuntime,
+      scalaPbRuntime,
+      scalaPbRuntime % "protobuf",
+      ceMunit % Test,
+      otel4sOtelJavaTestkit % Test,
+      otel4sSemconvExperimental % Test,
+      "io.grpc" % "grpc-inprocess" % versions.grpc % Test
+    ),
+    Compile / PB.targets := Seq(
+      scalapb.gen() -> (Compile / sourceManaged).value / "scalapb",
+      genModule(codegenFullName + "$") -> (Compile / sourceManaged).value / "fs2-grpc"
+    ),
+    githubWorkflowArtifactUpload := false,
+    scalacOptions := {
+      if (tlIsScala3.value) {
+        scalacOptions.value.filterNot(o => o == "-Ykind-projector:underscores" || o == "-Wvalue-discard")
+      } else scalacOptions.value
+    },
+    scalacOptions ++= {
+      if (tlIsScala3.value) { Seq("-language:implicitConversions", "-Ykind-projector", "-source:3.0-migration") }
+      else Seq.empty
+    }
+  )
+  .jvmPlatform(scalaVersions = Seq(Scala213, Scala3))

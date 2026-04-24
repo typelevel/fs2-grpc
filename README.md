@@ -126,6 +126,51 @@ The full set of options available are:
 PB.protocOptions in Compile := Seq("-xyz")
 ```
 
+## OpenTelemetry tracing with otel4s
+
+The `fs2-grpc-otel4s-trace` module provides client and service aspects for tracing with [otel4s](https://typelevel.org/otel4s/).
+The default configuration follows the OpenTelemetry gRPC semantic conventions for span kind, span name,
+`rpc.system.name`, `rpc.method`, and `rpc.response.status_code`.
+
+```scala
+import cats.effect.IO
+import fs2.grpc.otel4s.trace.{TraceClientAspect, TraceServiceAspect}
+import io.grpc.Metadata
+import org.typelevel.otel4s.trace.TracerProvider
+
+def clientAspect(implicit tracerProvider: TracerProvider[IO]) =
+  TraceClientAspect.create[IO]
+
+def serviceAspect(implicit tracerProvider: TracerProvider[IO]) =
+  TraceServiceAspect.create[IO]
+```
+
+Use `withServerAddress` when the logical server address is known. The aspect cannot infer it from the generated call
+context:
+
+```scala
+val clientConfig =
+  TraceClientAspect.Config.default
+    .withServerAddress("grpc.example.com", Some(443))
+
+val serviceConfig =
+  TraceServiceAspect.Config.default
+    .withServerAddress("grpc.example.com", Some(443))
+```
+
+Other defaults can be customized through `Config`, for example span names, metadata propagation, attributes, and
+finalization.
+
+```scala
+val clientConfig =
+  TraceClientAspect.Config.default
+    .withTracerName("my-client")
+    .withSpanName((_, ctx) => ctx.methodDescriptor.getFullMethodName)
+```
+
+See the [OpenTelemetry gRPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/grpc/) for the
+attribute definitions.
+
 ### Tool Sponsorship
 
 <img width="185px" height="44px" align="right" src="https://www.yourkit.com/images/yklogo.png"/>Development of fs2-grpc is generously supported in part by [YourKit](https://www.yourkit.com) through the use of their excellent Java profiler.

@@ -10,6 +10,7 @@ object Dependencies {
     val fs2 = "3.13.0"
     val catsEffect = "3.7.0"
     val ceMunit = "2.2.0"
+    val otel4s = "1.0.0-RC1"
 
     val sbtProtoc = "1.0.8"
 
@@ -19,6 +20,8 @@ object Dependencies {
 
   val fs2 = "co.fs2" %% "fs2-core" % versions.fs2
   val catsEffect = "org.typelevel" %% "cats-effect" % versions.catsEffect
+  val otel4sCoreTrace = "org.typelevel" %% "otel4s-core-trace" % versions.otel4s
+  val otel4sSemconv = "org.typelevel" %% "otel4s-semconv" % versions.otel4s
   val grpcApi = "io.grpc" % "grpc-api" % versions.grpc
 
   // Testing
@@ -26,6 +29,8 @@ object Dependencies {
   val ceTestkit = "org.typelevel" %% "cats-effect-testkit" % versions.catsEffect
   val ceMunit = "org.typelevel" %% "munit-cats-effect" % versions.ceMunit
   val grpcNetty = "io.grpc" % "grpc-netty-shaded" % versions.grpc
+  val otel4sOtelJavaTestkit = "org.typelevel" %% "otel4s-oteljava-testkit" % versions.otel4s
+  val otel4sSemconvExperimental = "org.typelevel" %% "otel4s-semconv-experimental" % versions.otel4s
 
   // Compiler & SBT Plugins
 

@@ -24,66 +24,53 @@ package grpc
 package syntax
 
 import java.util.concurrent.TimeUnit
+
 import cats.effect._
 import cats.syntax.all._
+import fs2.grpc.syntax.managedChannelBuilder._
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 
-trait ManagedChannelBuilderSyntax {
-  implicit final def fs2GrpcSyntaxManagedChannelBuilder[MCB <: ManagedChannelBuilder[MCB]](
+import scala.concurrent.duration.FiniteDuration
+
+trait ManagedChannelBuilderTimeoutSyntax {
+  implicit final def fs2GrpcSyntaxManagedChannelBuilderTimeout[MCB <: ManagedChannelBuilder[MCB]](
       builder: MCB
-  ): ManagedChannelBuilderOps[MCB] =
-    new ManagedChannelBuilderOps[MCB](builder)
+  ): ManagedChannelBuilderTimeoutOps[MCB] =
+    new ManagedChannelBuilderTimeoutOps[MCB](builder)
 }
 
-final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val builder: MCB) extends AnyVal {
+final class ManagedChannelBuilderTimeoutOps[MCB <: ManagedChannelBuilder[MCB]](val builder: MCB) extends AnyVal {
 
   /** Builds a `ManagedChannel` into a resource. The managed channel is shut down when the resource is released.
     * Shutdown is as follows:
     *
     *   i. We request an orderly shutdown, allowing preexisting calls to continue without accepting new calls.
-    *   i. We block for up to 30 seconds on termination, using the blocking context
+    *   i. We block for up to {timeout} on termination, using the blocking context
     *   i. If the channel is not yet terminated, we trigger a forceful shutdown
     *
-    * For different tradeoffs in shutdown behavior, see {{resourceWithShutdown}}.
+    * @param timeout
+    *   the duration of the timeout
     */
-  def resource[F[_]](implicit F: Sync[F]): Resource[F, ManagedChannel] =
-    resourceWithShutdown { ch =>
+  def resource[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Resource[F, ManagedChannel] =
+    builder.resourceWithShutdown { ch =>
       for {
         _ <- F.delay(ch.shutdown())
-        terminated <- F.interruptible(ch.awaitTermination(30, TimeUnit.SECONDS))
+        terminated <- F.interruptible(ch.awaitTermination(timeout.toSeconds, TimeUnit.SECONDS))
         _ <- F.unlessA(terminated)(F.delay(ch.shutdownNow()))
-      } yield (())
+      } yield ()
     }
-
-  /** Builds a `ManagedChannel` into a resource. The managed channel is shut down when the resource is released.
-    *
-    * @param shutdown
-    *   Determines the behavior of the cleanup of the managed channel, with respect to forceful vs. graceful shutdown
-    *   and how to poll or block for termination.
-    */
-  def resourceWithShutdown[F[_]](
-      shutdown: ManagedChannel => F[Unit]
-  )(implicit F: Sync[F]): Resource[F, ManagedChannel] =
-    Resource.make(F.delay(builder.build()))(shutdown)
 
   /** Builds a `ManagedChannel` into a stream. The managed channel is shut down when the stream is complete. Shutdown is
     * as follows:
     *
     *   i. We request an orderly shutdown, allowing preexisting calls to continue without accepting new calls.
-    *   i. We block for up to 30 seconds on termination, using the blocking context
+    *   i. We block for up to {timeout} on termination, using the blocking context
     *   i. If the channel is not yet terminated, we trigger a forceful shutdown
     *
-    * For different tradeoffs in shutdown behavior, see {{streamWithShutdown}}.
+    * @param timeout
+    *   the duration of the timeout
     */
-  def stream[F[_]](implicit F: Async[F]): Stream[F, ManagedChannel] =
-    Stream.resource(resource[F])
+  def stream[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Stream[F, ManagedChannel] =
+    Stream.resource(resource[F](timeout))
 
-  /** Builds a `ManagedChannel` into a stream. The managed channel is shut down when the stream is complete.
-    *
-    * @param shutdown
-    *   Determines the behavior of the cleanup of the managed channel, with respect to forceful vs. graceful shutdown
-    *   and how to poll or block for termination.
-    */
-  def streamWithShutdown[F[_]](shutdown: ManagedChannel => F[Unit])(implicit F: Async[F]): Stream[F, ManagedChannel] =
-    Stream.resource(resourceWithShutdown(shutdown))
 }

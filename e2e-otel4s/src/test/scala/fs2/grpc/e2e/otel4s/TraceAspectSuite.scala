@@ -51,6 +51,8 @@ import org.typelevel.otel4s.semconv.experimental.attributes.RpcExperimentalAttri
 import org.typelevel.otel4s.trace.{SpanContext, SpanKind, Tracer}
 import org.typelevel.otel4s.{Attribute, Attributes}
 
+import scala.concurrent.duration._
+
 class TraceAspectSuite extends CatsEffectSuite {
 
   withFixture("follow request's span") { fixture =>
@@ -500,10 +502,10 @@ class TraceAspectSuite extends CatsEffectSuite {
     InProcessServerBuilder
       .forName(id)
       .addService(xs)
-      .resource[IO]
+      .resource[IO](30.seconds)
       .evalTap(s => IO.delay(s.start()))
 
   private def bindClientChannel(id: String): Resource[IO, Channel] =
-    InProcessChannelBuilder.forName(id).usePlaintext().resource[IO]
+    InProcessChannelBuilder.forName(id).usePlaintext().resource[IO](30.seconds)
 
 }

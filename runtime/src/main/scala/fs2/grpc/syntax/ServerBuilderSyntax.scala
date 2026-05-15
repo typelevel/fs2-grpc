@@ -44,12 +44,9 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     *   i. If the server is not yet terminated, we trigger a forceful shutdown
     *
     * For different tradeoffs in shutdown behavior, see [[resourceWithShutdown]].
-    *
-    * @see
-    *   [[resourceWithShutdownTimeout]] to explicitly set the timeout
     */
   def resource[F[_]](implicit F: Sync[F]): Resource[F, Server] =
-    resourceWithShutdownTimeout(30.seconds)
+    resource(30.seconds)
 
   /** Builds a `Server` into a resource. The server is shut down when the resource is released. Shutdown is as follows:
     *
@@ -62,7 +59,7 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     * @param timeout
     *   the duration of the timeout
     */
-  def resourceWithShutdownTimeout[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Resource[F, Server] =
+  def resource[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Resource[F, Server] =
     resourceWithShutdown { server =>
       for {
         _ <- F.delay(server.shutdown())
@@ -87,9 +84,6 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     *   i. If the server is not yet terminated, we trigger a forceful shutdown
     *
     * For different tradeoffs in shutdown behavior, see [[streamWithShutdown]].
-    *
-    * @see
-    *   [[streamWithShutdownTimeout]] to explicitly set the timeout
     */
   def stream[F[_]](implicit F: Async[F]): Stream[F, Server] =
     Stream.resource(resource[F])
@@ -101,9 +95,12 @@ final class ServerBuilderOps[SB <: ServerBuilder[SB]](val builder: SB) extends A
     *   i. If the server is not yet terminated, we trigger a forceful shutdown
     *
     * For different tradeoffs in shutdown behavior, see [[streamWithShutdown]].
+    *
+    * @param timeout
+    *   the duration of the timeout
     */
-  def streamWithShutdownTimeout[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Stream[F, Server] =
-    Stream.resource(resourceWithShutdownTimeout[F](timeout))
+  def stream[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Stream[F, Server] =
+    Stream.resource(resource[F](timeout))
 
   /** Builds a `Server` into a stream. The server is shut down when the stream is complete.
     *

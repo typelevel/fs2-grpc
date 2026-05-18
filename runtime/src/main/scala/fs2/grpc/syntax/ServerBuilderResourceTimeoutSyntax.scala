@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit
 import cats.effect._
 import cats.syntax.all._
 import io.grpc.{Server, ServerBuilder}
-import fs2.grpc.syntax.serverBuilder._
 
 import scala.concurrent.duration._
 
@@ -49,8 +48,8 @@ final class ServerBuilderResourceTimeoutOps[SB <: ServerBuilder[SB]](val builder
     * @param timeout
     *   the duration of the timeout
     */
-  def resource[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Resource[F, Server] =
-    builder.resourceWithShutdown { server =>
+  def resourceWithShutdownTimeout[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Resource[F, Server] =
+    new ServerBuilderOps[SB](builder).resourceWithShutdown { server =>
       for {
         _ <- F.delay(server.shutdown())
         terminated <- F.interruptible(server.awaitTermination(timeout.toSeconds, TimeUnit.SECONDS))
@@ -67,7 +66,7 @@ final class ServerBuilderResourceTimeoutOps[SB <: ServerBuilder[SB]](val builder
     * @param timeout
     *   the duration of the timeout
     */
-  def stream[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Stream[F, Server] =
-    Stream.resource(resource[F](timeout))
+  def streamWithShutdownTimeout[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Stream[F, Server] =
+    Stream.resource(resourceWithShutdownTimeout[F](timeout))
 
 }

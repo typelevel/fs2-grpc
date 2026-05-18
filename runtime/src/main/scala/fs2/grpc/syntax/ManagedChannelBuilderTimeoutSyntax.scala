@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit
 
 import cats.effect._
 import cats.syntax.all._
-import fs2.grpc.syntax.managedChannelBuilder._
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 
 import scala.concurrent.duration.FiniteDuration
@@ -51,8 +50,8 @@ final class ManagedChannelBuilderTimeoutOps[MCB <: ManagedChannelBuilder[MCB]](v
     * @param timeout
     *   the duration of the timeout
     */
-  def resource[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Resource[F, ManagedChannel] =
-    builder.resourceWithShutdown { ch =>
+  def resourceWithShutdownTimeout[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Resource[F, ManagedChannel] =
+    new ManagedChannelBuilderOps[MCB](builder).resourceWithShutdown { ch =>
       for {
         _ <- F.delay(ch.shutdown())
         terminated <- F.interruptible(ch.awaitTermination(timeout.toSeconds, TimeUnit.SECONDS))
@@ -70,7 +69,7 @@ final class ManagedChannelBuilderTimeoutOps[MCB <: ManagedChannelBuilder[MCB]](v
     * @param timeout
     *   the duration of the timeout
     */
-  def stream[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Stream[F, ManagedChannel] =
-    Stream.resource(resource[F](timeout))
+  def streamWithShutdownTimeout[F[_]](timeout: FiniteDuration)(implicit F: Sync[F]): Stream[F, ManagedChannel] =
+    Stream.resource(resourceWithShutdownTimeout[F](timeout))
 
 }

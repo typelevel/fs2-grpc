@@ -502,10 +502,10 @@ class TraceAspectSuite extends CatsEffectSuite {
     InProcessServerBuilder
       .forName(id)
       .addService(xs)
-      .resource[IO](30.seconds)
+      .resourceWithShutdownTimeout[IO](30.seconds)
       .evalTap(s => IO.delay(s.start()))
 
   private def bindClientChannel(id: String): Resource[IO, Channel] =
-    InProcessChannelBuilder.forName(id).usePlaintext().resource[IO](30.seconds)
+    InProcessChannelBuilder.forName(id).usePlaintext().resourceWithShutdownTimeout[IO](30.seconds)
 
 }

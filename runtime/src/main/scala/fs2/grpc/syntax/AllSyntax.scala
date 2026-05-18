@@ -25,6 +25,6 @@ package syntax
 
 trait AllSyntax
     extends ManagedChannelBuilderSyntax
-    with ServerBuilderSyntax
     with ManagedChannelBuilderTimeoutSyntax
+    with ServerBuilderSyntax
     with ServerBuilderResourceTimeoutSyntax

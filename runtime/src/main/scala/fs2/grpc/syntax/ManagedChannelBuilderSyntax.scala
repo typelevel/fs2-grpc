@@ -44,7 +44,7 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
     *   i. We block for up to 30 seconds on termination, using the blocking context
     *   i. If the channel is not yet terminated, we trigger a forceful shutdown
     *
-    * For different tradeoffs in shutdown behavior, see {{resourceWithShutdown}}.
+    * For different tradeoffs in shutdown behavior, see [[resourceWithShutdown]].
     */
   def resource[F[_]](implicit F: Sync[F]): Resource[F, ManagedChannel] =
     resourceWithShutdown { ch =>
@@ -73,7 +73,7 @@ final class ManagedChannelBuilderOps[MCB <: ManagedChannelBuilder[MCB]](val buil
     *   i. We block for up to 30 seconds on termination, using the blocking context
     *   i. If the channel is not yet terminated, we trigger a forceful shutdown
     *
-    * For different tradeoffs in shutdown behavior, see {{streamWithShutdown}}.
+    * For different tradeoffs in shutdown behavior, see [[streamWithShutdown]].
     */
   def stream[F[_]](implicit F: Async[F]): Stream[F, ManagedChannel] =
     Stream.resource(resource[F])

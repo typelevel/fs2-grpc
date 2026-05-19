@@ -24,6 +24,6 @@ package grpc
 
 package object syntax {
   object all extends AllSyntax
-  object managedChannelBuilder extends ManagedChannelBuilderSyntax
-  object serverBuilder extends ServerBuilderSyntax
+  object managedChannelBuilder extends ManagedChannelBuilderSyntax with ManagedChannelBuilderTimeoutSyntax
+  object serverBuilder extends ServerBuilderSyntax with ServerBuilderResourceTimeoutSyntax
 }

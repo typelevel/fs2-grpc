@@ -23,4 +23,8 @@ package fs2
 package grpc
 package syntax
 
-trait AllSyntax extends ManagedChannelBuilderSyntax with ServerBuilderSyntax
+trait AllSyntax
+    extends ManagedChannelBuilderSyntax
+    with ManagedChannelBuilderTimeoutSyntax
+    with ServerBuilderSyntax
+    with ServerBuilderResourceTimeoutSyntax

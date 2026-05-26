@@ -23,6 +23,7 @@ package fs2.grpc.otel4s.trace
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import cats.~>
 import fs2.Stream
 import fs2.grpc.server._
 import io.grpc.Metadata
@@ -31,8 +32,6 @@ import org.typelevel.otel4s.context.propagation.TextMapGetter
 import org.typelevel.otel4s.trace._
 import fs2.grpc.BuildInfo
 import org.typelevel.otel4s.semconv.attributes.ServerAttributes
-
-import scala.util.chaining._
 
 private class TraceServiceAspect[F[_]: MonadCancelThrow: Tracer](
     spanName: (AspectOperation, ServiceCallContext[?, ?]) => String,
@@ -52,12 +51,15 @@ private class TraceServiceAspect[F[_]: MonadCancelThrow: Tracer](
       callCtx: ServiceCallContext[Req, Res],
       req: Req,
       run: (Req, Metadata) => Stream[F, Res]
-  ): Stream[F, Res] =
-    Stream.eval(Tracer[F].joinOrRoot(callCtx.metadata)(Tracer[F].currentSpanContext)).flatMap { ctx =>
-      Stream.resource(span(AspectOperation.UnaryToStreamingCall, callCtx, ctx).resource).flatMap { res =>
-        run(req, callCtx.metadata).translate(res.trace)
-      }
+  ): Stream[F, Res] = {
+    val joined = new (F ~> F) {
+      def apply[A](fa: F[A]): F[A] = Tracer[F].joinOrRoot(callCtx.metadata)(fa)
     }
+    Stream
+      .resource(span(AspectOperation.UnaryToStreamingCall, callCtx).resource)
+      .flatMap(res => run(req, callCtx.metadata).translate(res.trace))
+      .translate(joined)
+  }
 
   def visitStreamingToUnaryCall[Req, Res](
       callCtx: ServiceCallContext[Req, Res],
@@ -70,12 +72,15 @@ private class TraceServiceAspect[F[_]: MonadCancelThrow: Tracer](
       callCtx: ServiceCallContext[Req, Res],
       req: Stream[F, Req],
       run: (Stream[F, Req], Metadata) => Stream[F, Res]
-  ): Stream[F, Res] =
-    Stream.eval(Tracer[F].joinOrRoot(callCtx.metadata)(Tracer[F].currentSpanContext)).flatMap { ctx =>
-      Stream.resource(span(AspectOperation.StreamingToStreamingCall, callCtx, ctx).resource).flatMap { res =>
-        run(req, callCtx.metadata).translate(res.trace)
-      }
+  ): Stream[F, Res] = {
+    val joined = new (F ~> F) {
+      def apply[A](fa: F[A]): F[A] = Tracer[F].joinOrRoot(callCtx.metadata)(fa)
     }
+    Stream
+      .resource(span(AspectOperation.StreamingToStreamingCall, callCtx).resource)
+      .flatMap(res => run(req, callCtx.metadata).translate(res.trace))
+      .translate(joined)
+  }
 
   def visitUnaryToUnaryCallTrailers[Req, Res](
       callCtx: ServiceCallContext[Req, Res],
@@ -94,17 +99,16 @@ private class TraceServiceAspect[F[_]: MonadCancelThrow: Tracer](
   private def joinOrRoot[A](operation: AspectOperation, callCtx: ServiceCallContext[?, ?], fa: => F[A]): F[A] =
     MonadCancelThrow[F].uncancelable { poll =>
       Tracer[F].joinOrRoot(callCtx.metadata) {
-        span(operation, callCtx, None).surround(poll(fa))
+        span(operation, callCtx).surround(poll(fa))
       }
     }
 
-  private def span(operation: AspectOperation, ctx: ServiceCallContext[?, ?], parent: Option[SpanContext]) =
+  private def span(operation: AspectOperation, ctx: ServiceCallContext[?, ?]) =
     Tracer[F]
       .spanBuilder(spanName(operation, ctx))
       .addAttributes(attributes(operation, ctx))
       .withSpanKind(SpanKind.Server)
       .withFinalizationStrategy(finalizationStrategy(operation, ctx))
-      .pipe(b => parent.fold(b)(b.withParent(_)))
       .build
 
 }

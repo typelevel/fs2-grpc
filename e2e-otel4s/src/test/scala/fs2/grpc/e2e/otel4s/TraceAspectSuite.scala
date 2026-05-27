@@ -22,7 +22,7 @@
 package fs2.grpc.e2e.otel4s
 
 import cats.effect.std.Dispatcher
-import cats.effect.{Async, IO, Resource}
+import cats.effect.{Async, IO, Ref, Resource}
 import fs2.Stream
 import fs2.grpc.client.ClientOptions
 import fs2.grpc.otel4s.trace.{TraceClientAspect, TraceServiceAspect}
@@ -37,8 +37,10 @@ import hello.world.test_service.{
 }
 import io.grpc.inprocess.{InProcessChannelBuilder, InProcessServerBuilder}
 import io.grpc.{Channel, Metadata, Server, ServerServiceDefinition, Status, StatusRuntimeException}
+import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import munit.{CatsEffectSuite, Location, TestOptions}
+import org.typelevel.otel4s.baggage.{Baggage, BaggageManager}
 import org.typelevel.otel4s.oteljava.testkit.OtelJavaTestkit
 import org.typelevel.otel4s.oteljava.testkit.trace.{
   SpanContextExpectation,
@@ -115,6 +117,37 @@ class TraceAspectSuite extends CatsEffectSuite {
         )
       )
     } yield ()
+  }
+
+  withFixture("propagate baggage to the unary handler") { fixture =>
+    for {
+      _ <- fixture.baggageManager.scope(Baggage.empty.updated("user.id", "alice")) {
+        fixture.client.noStreaming(TestRequest(), new Metadata()).void
+      }
+      captured <- fixture.capturedBaggage.get
+    } yield assertEquals(captured.get(Op.NoStreaming), Some(Some("alice")))
+  }
+
+  // streaming server aspect calls `joinOrRoot(metadata) { currentSpanContext }`, closing the
+  // joined scope before the handler runs, which drops propagated baggage
+  withFixture("propagate baggage to the server-streaming handler") { fixture =>
+    for {
+      _ <- fixture.baggageManager.scope(Baggage.empty.updated("user.id", "alice")) {
+        fixture.client.serverStreaming(TestRequest(), new Metadata()).compile.drain
+      }
+      captured <- fixture.capturedBaggage.get
+    } yield assertEquals(captured.get(Op.ServerStreaming), Some(Some("alice")))
+  }
+
+  // streaming server aspect calls `joinOrRoot(metadata) { currentSpanContext }`, closing the
+  // joined scope before the handler runs, which drops propagated baggage
+  withFixture("propagate baggage to the bidirectional-streaming handler") { fixture =>
+    for {
+      _ <- fixture.baggageManager.scope(Baggage.empty.updated("user.id", "alice")) {
+        fixture.client.bothStreaming(Stream.emit(TestRequest()), new Metadata()).compile.drain
+      }
+      captured <- fixture.capturedBaggage.get
+    } yield assertEquals(captured.get(Op.BothStreaming), Some(Some("alice")))
   }
 
   withFixture(
@@ -397,7 +430,10 @@ class TraceAspectSuite extends CatsEffectSuite {
       serviceBehavior: ServiceBehavior
   ): Resource[IO, Fix] =
     for {
-      testkit <- OtelJavaTestkit.builder[IO].addTextMapPropagators(W3CTraceContextPropagator.getInstance()).build
+      testkit <- OtelJavaTestkit
+        .builder[IO]
+        .addTextMapPropagators(W3CTraceContextPropagator.getInstance(), W3CBaggagePropagator.getInstance())
+        .build
 
       dispatcher <- Dispatcher.parallel[IO]
 
@@ -408,9 +444,11 @@ class TraceAspectSuite extends CatsEffectSuite {
 
       tracer <- testkit.tracerProvider.get("service").toResource
 
+      capturedBaggage <- Ref[IO].of(Map.empty[Op, Option[String]]).toResource
+
       serviceDefinition = TestServiceFs2Grpc.serviceFull(
         dispatcher,
-        new TestService(serviceBehavior)(tracer),
+        new TestService(serviceBehavior, capturedBaggage)(tracer, testkit.baggageManager),
         serviceAspect,
         ServerOptions.default
       )
@@ -427,12 +465,14 @@ class TraceAspectSuite extends CatsEffectSuite {
         clientAspect,
         ClientOptions.default
       )
-    } yield new Fix(client, testkit, tracer)
+    } yield new Fix(client, testkit, tracer, testkit.baggageManager, capturedBaggage)
 
   private final class Fix(
       val client: TestServiceFs2GrpcTrailers[IO, Metadata],
       val testkit: OtelJavaTestkit[IO],
-      val tracer: Tracer[IO]
+      val tracer: Tracer[IO],
+      val baggageManager: BaggageManager[IO],
+      val capturedBaggage: Ref[IO, Map[Op, Option[String]]]
   ) {
     def assertTraces(expectation: TraceForestExpectation)(implicit loc: Location): IO[Unit] =
       testkit.finishedSpans.flatMap { spans =>
@@ -466,36 +506,46 @@ class TraceAspectSuite extends CatsEffectSuite {
       ServiceBehavior(Some(status))
   }
 
-  private class TestService(behavior: ServiceBehavior)(implicit T: Tracer[IO])
+  private class TestService(
+      behavior: ServiceBehavior,
+      capturedBaggage: Ref[IO, Map[Op, Option[String]]]
+  )(implicit T: Tracer[IO], B: BaggageManager[IO])
       extends TestServiceFs2Grpc[IO, Metadata] {
+    private def capture(op: Op): IO[Unit] =
+      BaggageManager[IO].getValue("user.id").flatMap(v => capturedBaggage.update(_ + (op -> v)))
+
     def noStreaming(request: TestRequest, ctx: Metadata): IO[TestResponse] =
       behavior.noStreamingFailure match {
         case Some(status) =>
           IO.raiseError(status.asRuntimeException())
         case None =>
-          T.span("internal-handler:noStreaming").surround {
-            IO.pure(TestResponse())
-          }
+          capture(Op.NoStreaming) *>
+            T.span("internal-handler:noStreaming").surround {
+              IO.pure(TestResponse())
+            }
       }
 
     def clientStreaming(request: Stream[IO, TestRequest], ctx: Metadata): IO[TestResponse] =
-      T.span("internal-handler:clientStreaming").surround {
-        IO.pure(TestResponse())
-      }
+      capture(Op.ClientStreaming) *>
+        T.span("internal-handler:clientStreaming").surround {
+          IO.pure(TestResponse())
+        }
 
     def serverStreaming(request: TestRequest, ctx: Metadata): Stream[IO, TestResponse] =
-      Stream.eval {
-        T.span("internal-handler:serverStreaming").surround {
-          IO.pure(TestResponse())
+      Stream.eval(capture(Op.ServerStreaming)) >>
+        Stream.eval {
+          T.span("internal-handler:serverStreaming").surround {
+            IO.pure(TestResponse())
+          }
         }
-      }
 
     def bothStreaming(request: Stream[IO, TestRequest], ctx: Metadata): Stream[IO, TestResponse] =
-      Stream.eval {
-        T.span("internal-handler:bothStreaming").surround {
-          IO.pure(TestResponse())
+      Stream.eval(capture(Op.BothStreaming)) >>
+        Stream.eval {
+          T.span("internal-handler:bothStreaming").surround {
+            IO.pure(TestResponse())
+          }
         }
-      }
   }
 
   private def startServices(id: String)(xs: ServerServiceDefinition): Resource[IO, Server] =

@@ -25,23 +25,21 @@ package client
 
 import cats.effect.SyncIO
 import cats.implicits._
-import cats.effect.kernel.Concurrent
-import cats.effect.std.Dispatcher
+import cats.effect.kernel.Async
 import fs2.grpc.shared.StreamIngest
 import io.grpc.{ClientCall, Metadata, Status}
 
 private[client] class Fs2StreamClientCallListener[F[_], Response] private (
     ingest: StreamIngest[F, Response],
-    signalReadiness: SyncIO[Unit],
-    dispatcher: Dispatcher[F]
+    signalReadiness: SyncIO[Unit]
 ) extends ClientCall.Listener[Response] {
 
   override def onMessage(message: Response): Unit =
-    dispatcher.unsafeRunSync(ingest.onMessage(message))
+    ingest.unsafeOnMessage(message)
 
   override def onClose(status: Status, trailers: Metadata): Unit = {
     val error = if (status.isOk) None else Some(status.asRuntimeException(trailers))
-    dispatcher.unsafeRunSync(ingest.onClose(error))
+    ingest.unsafeOnClose(error)
   }
 
   override def onReady(): Unit = signalReadiness.unsafeRunSync()
@@ -51,14 +49,13 @@ private[client] class Fs2StreamClientCallListener[F[_], Response] private (
 
 private[client] object Fs2StreamClientCallListener {
 
-  def create[F[_]: Concurrent, Response](
+  def create[F[_]: Async, Response](
       request: Int => F[Unit],
       signalReadiness: SyncIO[Unit],
-      dispatcher: Dispatcher[F],
       prefetchN: Int
   ): F[Fs2StreamClientCallListener[F, Response]] =
     StreamIngest[F, Response](request, prefetchN).map(
-      new Fs2StreamClientCallListener[F, Response](_, signalReadiness, dispatcher)
+      new Fs2StreamClientCallListener[F, Response](_, signalReadiness)
     )
 
 }

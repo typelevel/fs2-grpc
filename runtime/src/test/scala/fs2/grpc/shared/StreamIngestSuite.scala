@@ -23,6 +23,7 @@ package fs2
 package grpc
 package shared
 
+import cats.syntax.all._
 import cats.effect._
 import munit._
 
@@ -30,24 +31,36 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
 
   test("basic") {
 
-    def run(prefetchN: Int, takeN: Int, expectedReq: Int, expectedCount: Int) = {
+    def run(emitN: Int, prefetchN: Int, takeN: Int, expectedReq: Int, expectedCount: Int) = {
+      def capture(s: Stream[IO, Int]): IO[List[Int]] = s.take(takeN.toLong).compile.toList
+
       for {
         ref <- IO.ref(0)
         ingest <- StreamIngest[IO, Int](req => ref.update(_ + req), prefetchN)
-        _ <- Stream.emits((1 to prefetchN)).evalTap(ingest.onMessage).compile.drain
-        messages <- ingest.messages.take(takeN.toLong).compile.toList
+        emitted = Stream.emits((1 to emitN)).covary[IO]
+        _ <- emitted.evalTap(ingest.onMessage).compile.drain
+        messages <- capture(ingest.messages)
+        expectedMsgs <- capture(emitted)
         requested <- ref.get
       } yield {
         assertEquals(messages.size, expectedCount)
+        assertEquals(messages, expectedMsgs)
         assertEquals(requested, expectedReq)
       }
     }
 
-    run(prefetchN = 1, takeN = 1, expectedReq = 1, expectedCount = 1) *>
-      run(prefetchN = 2, takeN = 1, expectedReq = 2, expectedCount = 1) *>
-      run(prefetchN = 2, takeN = 2, expectedReq = 2, expectedCount = 2) *>
-      run(prefetchN = 1024, takeN = 1024, expectedReq = 1024, expectedCount = 1024) *>
-      run(prefetchN = 1024, takeN = 1023, expectedReq = 1024, expectedCount = 1023)
+    List(
+      run(emitN = 1, prefetchN = 1, takeN = 1, expectedReq = 0, expectedCount = 1),
+      run(emitN = 1, prefetchN = 2, takeN = 1, expectedReq = 2, expectedCount = 1),
+      run(emitN = 2, prefetchN = 2, takeN = 1, expectedReq = 0, expectedCount = 1),
+      run(emitN = 2, prefetchN = 4, takeN = 1, expectedReq = 4, expectedCount = 1),
+      run(emitN = 2, prefetchN = 1, takeN = 2, expectedReq = 0, expectedCount = 2),
+      run(emitN = 2, prefetchN = 4, takeN = 2, expectedReq = 4, expectedCount = 2),
+      run(emitN = 1024, prefetchN = 1024, takeN = 1024, expectedReq = 0, expectedCount = 1024),
+      run(emitN = 1024, prefetchN = 2048, takeN = 1024, expectedReq = 2048, expectedCount = 1024),
+      run(emitN = 1024, prefetchN = 1024, takeN = 1023, expectedReq = 0, expectedCount = 1023),
+      run(emitN = 1024, prefetchN = 2048, takeN = 1023, expectedReq = 2048, expectedCount = 1023)
+    ).combineAll
 
   }
 

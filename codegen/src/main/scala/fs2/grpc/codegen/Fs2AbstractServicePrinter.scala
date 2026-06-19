@@ -39,7 +39,7 @@ abstract class Fs2AbstractServicePrinter extends Fs2ServicePrinter {
 
   private[this] val serviceName: String = service.name
   private[this] val serviceNameFs2: String = s"$serviceName${serviceSuffix}"
-  private[this] val servicePkgName: String = service.getFile.scalaPackage.fullName
+  private[this] val servicePkgName: String = service.getFile.scalaPackage.fullName.stripPrefix("_root_.")
 
   protected def serviceMethodSignature(method: MethodDescriptor): String
 

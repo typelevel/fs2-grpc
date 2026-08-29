@@ -45,12 +45,12 @@ private[server] class Fs2StreamServerCallListener[F[_], Request, Response] priva
     dispatcher.unsafeRunSync(isCancelled.complete(()).void)
 
   override def onMessage(message: Request): Unit =
-    dispatcher.unsafeRunSync(ingest.onMessage(message))
+    ingest.unsafeOnMessage(message)
 
   override def onReady(): Unit = signalReadiness.unsafeRunSync()
 
   override def onHalfClose(): Unit =
-    dispatcher.unsafeRunSync(ingest.onClose(None))
+    ingest.unsafeOnClose(None)
 
   override def source: Stream[F, Request] = ingest.messages
 }

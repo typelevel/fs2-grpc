@@ -34,7 +34,7 @@ class StreamIngestSuite extends CatsEffectSuite with CatsEffectFunFixtures {
       for {
         ref <- IO.ref(0)
         ingest <- StreamIngest[IO, Int](req => ref.update(_ + req), prefetchN)
-        _ <- Stream.emits((1 to prefetchN)).evalTap(ingest.onMessage).compile.drain
+        _ <- Stream.emits((1 to prefetchN)).evalTap(m => IO(ingest.unsafeOnMessage(m))).compile.drain
         messages <- ingest.messages.take(takeN.toLong).compile.toList
         requested <- ref.get
       } yield {

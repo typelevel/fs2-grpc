@@ -108,7 +108,7 @@ class Fs2ClientCall[F[_], Request, Response] private[client] (
       signalReadiness: SyncIO[Unit]
   ): Resource[F, Fs2StreamClientCallListener[F, Response]] = {
     val prefetchN = options.prefetchN.max(1)
-    val create = Fs2StreamClientCallListener.create[F, Response](request, signalReadiness, dispatcher, prefetchN)
+    val create = Fs2StreamClientCallListener.create[F, Response](request, signalReadiness, prefetchN)
     val acquire = start(create, md)
     val release = handleExitCase(cancelSucceed = true)
 

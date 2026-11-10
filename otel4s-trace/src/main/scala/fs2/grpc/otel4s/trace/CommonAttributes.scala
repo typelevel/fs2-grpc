@@ -21,26 +21,21 @@
 
 package fs2.grpc.otel4s.trace
 
-import org.typelevel.otel4s.{Attribute, AttributeKey}
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.semconv.attributes.RpcAttributes
 
 /** @see
   *   [[https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/]]
   */
 private[trace] object CommonAttributes {
 
-  private object Keys {
-    val rpcSystemName: AttributeKey[String] = AttributeKey.string("rpc.system.name")
-    val rpcMethod: AttributeKey[String] = AttributeKey.string("rpc.method")
-    val rpcResponseStatusCode: AttributeKey[String] = AttributeKey.string("rpc.response.status_code")
-  }
-
   val rpcSystem: Attribute[String] =
-    Keys.rpcSystemName("grpc")
+    RpcAttributes.RpcSystemName(RpcAttributes.RpcSystemNameValue.Grpc.value)
 
   def rpcMethod(method: String): Attribute[String] =
-    Keys.rpcMethod(method)
+    RpcAttributes.RpcMethod(method)
 
-  def rpcResponseStatusCode(statusCode: String): Attribute[String] =
-    Keys.rpcResponseStatusCode(statusCode)
+  def rpcStatusCode(statusCode: String): Attribute[String] =
+    RpcAttributes.RpcStatusCode(statusCode)
 
 }

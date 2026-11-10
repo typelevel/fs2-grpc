@@ -130,7 +130,7 @@ PB.protocOptions in Compile := Seq("-xyz")
 
 The `fs2-grpc-otel4s-trace` module provides client and service aspects for tracing with [otel4s](https://typelevel.org/otel4s/).
 The default configuration follows the OpenTelemetry gRPC semantic conventions for span kind, span name,
-`rpc.system.name`, `rpc.method`, and `rpc.response.status_code`.
+`rpc.system.name`, `rpc.method`, and `rpc.status_code`.
 
 ```scala
 import cats.effect.IO

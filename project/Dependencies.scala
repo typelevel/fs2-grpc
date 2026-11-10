@@ -30,7 +30,6 @@ object Dependencies {
   val ceMunit = "org.typelevel" %% "munit-cats-effect" % versions.ceMunit
   val grpcNetty = "io.grpc" % "grpc-netty-shaded" % versions.grpc
   val otel4sOtelJavaTestkit = "org.typelevel" %% "otel4s-oteljava-testkit" % versions.otel4s
-  val otel4sSemconvExperimental = "org.typelevel" %% "otel4s-semconv-experimental" % versions.otel4s
 
   // Compiler & SBT Plugins
 

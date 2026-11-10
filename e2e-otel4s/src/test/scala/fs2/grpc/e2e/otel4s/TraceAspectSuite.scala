@@ -49,7 +49,7 @@ import org.typelevel.otel4s.oteljava.testkit.trace.{
   TraceExpectations,
   TraceForestExpectation
 }
-import org.typelevel.otel4s.semconv.experimental.attributes.RpcExperimentalAttributes
+import org.typelevel.otel4s.semconv.attributes.RpcAttributes
 import org.typelevel.otel4s.trace.{SpanContext, SpanKind, Tracer}
 import org.typelevel.otel4s.{Attribute, Attributes}
 
@@ -168,7 +168,7 @@ class TraceAspectSuite extends CatsEffectSuite {
               TestServiceGrpc.METHOD_NO_STREAMING.getFullMethodName,
               Attributes(
                 Attribute("client-operation", "UnaryToUnaryCallTrailers"),
-                RpcExperimentalAttributes.RpcResponseStatusCode("OK")
+                RpcAttributes.RpcStatusCode("OK")
               ),
               traceId,
               SpanKind.Client
@@ -178,7 +178,7 @@ class TraceAspectSuite extends CatsEffectSuite {
                 TestServiceGrpc.METHOD_NO_STREAMING.getFullMethodName,
                 Attributes(
                   Attribute("service-operation", "UnaryToUnaryCall"),
-                  RpcExperimentalAttributes.RpcResponseStatusCode("OK")
+                  RpcAttributes.RpcStatusCode("OK")
                 ),
                 traceId,
                 SpanKind.Server
@@ -338,9 +338,9 @@ class TraceAspectSuite extends CatsEffectSuite {
       serviceAttributes: Attributes = Attributes.empty
   ): TraceForestExpectation = {
     val attributes = Attributes(
-      RpcExperimentalAttributes.RpcSystemName(RpcExperimentalAttributes.RpcSystemValue.Grpc.value),
-      RpcExperimentalAttributes.RpcMethod(methodName),
-      RpcExperimentalAttributes.RpcResponseStatusCode("OK")
+      RpcAttributes.RpcSystemName(RpcAttributes.RpcSystemNameValue.Grpc.value),
+      RpcAttributes.RpcMethod(methodName),
+      RpcAttributes.RpcStatusCode("OK")
     )
 
     TraceForestExpectation.ordered(
@@ -382,9 +382,9 @@ class TraceAspectSuite extends CatsEffectSuite {
       serverError: Boolean
   ): TraceForestExpectation = {
     val baseAttributes = Attributes(
-      RpcExperimentalAttributes.RpcSystemName(RpcExperimentalAttributes.RpcSystemValue.Grpc.value),
-      RpcExperimentalAttributes.RpcMethod(methodName),
-      RpcExperimentalAttributes.RpcResponseStatusCode(code)
+      RpcAttributes.RpcSystemName(RpcAttributes.RpcSystemNameValue.Grpc.value),
+      RpcAttributes.RpcMethod(methodName),
+      RpcAttributes.RpcStatusCode(code)
     )
     val clientAttributes =
       if (clientError) baseAttributes ++ Attributes(Attribute("error.type", code)) else baseAttributes

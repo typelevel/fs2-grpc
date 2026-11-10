@@ -47,7 +47,9 @@ inThisBuild(
       ProblemFilters.exclude[MissingFieldProblem]("fs2.grpc.codegen.Fs2GrpcServicePrinter.constants"),
       // deleted private classes
       ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.client.Fs2UnaryClientCallListener*"),
-      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*")
+      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.server.Fs2UnaryServerCallListener*"),
+      ProblemFilters.exclude[MissingClassProblem]("fs2.grpc.otel4s.trace.CommonAttributes$Keys$"),
+      ProblemFilters.exclude[DirectMissingMethodProblem]("fs2.grpc.otel4s.trace.CommonAttributes.rpcResponseStatusCode")
     )
   )
 )
@@ -232,7 +234,7 @@ lazy val e2eOtel4s = (projectMatrix in file("e2e-otel4s"))
       scalaPbRuntime % "protobuf",
       ceMunit % Test,
       otel4sOtelJavaTestkit % Test,
-      otel4sSemconvExperimental % Test,
+      otel4sSemconv % Test,
       "io.grpc" % "grpc-inprocess" % versions.grpc % Test
     ),
     Compile / PB.targets := Seq(

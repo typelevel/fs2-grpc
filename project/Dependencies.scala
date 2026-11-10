@@ -10,7 +10,7 @@ object Dependencies {
     val fs2 = "3.14.0"
     val catsEffect = "3.7.1"
     val ceMunit = "2.2.1"
-    val otel4s = "1.1.0"
+    val otel4s = "1.2.0"
 
     val sbtProtoc = "1.0.8"
 
@@ -30,7 +30,6 @@ object Dependencies {
   val ceMunit = "org.typelevel" %% "munit-cats-effect" % versions.ceMunit
   val grpcNetty = "io.grpc" % "grpc-netty-shaded" % versions.grpc
   val otel4sOtelJavaTestkit = "org.typelevel" %% "otel4s-oteljava-testkit" % versions.otel4s
-  val otel4sSemconvExperimental = "org.typelevel" %% "otel4s-semconv-experimental" % versions.otel4s
 
   // Compiler & SBT Plugins
 

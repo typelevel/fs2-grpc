@@ -40,13 +40,13 @@ private[trace] object GrpcSpanFinalizers {
 
   val client: SpanFinalizer.Strategy = {
     case Resource.ExitCase.Succeeded =>
-      SpanFinalizer.addAttribute(CommonAttributes.rpcResponseStatusCode(Status.Code.OK.name()))
+      SpanFinalizer.addAttribute(CommonAttributes.rpcStatusCode(Status.Code.OK.name()))
 
     case Resource.ExitCase.Canceled =>
       val code = Status.Code.CANCELLED.name()
 
       SpanFinalizer.addAttributes(
-        CommonAttributes.rpcResponseStatusCode(code),
+        CommonAttributes.rpcStatusCode(code),
         ErrorAttributes.ErrorType(code)
       ) |+|
         SpanFinalizer.setStatus(StatusCode.Error, code)
@@ -55,7 +55,7 @@ private[trace] object GrpcSpanFinalizers {
       val code = clientStatusCode(error).name()
 
       SpanFinalizer.addAttributes(
-        CommonAttributes.rpcResponseStatusCode(code),
+        CommonAttributes.rpcStatusCode(code),
         ErrorAttributes.ErrorType(code)
       ) |+|
         SpanFinalizer.recordException(error) |+|
@@ -64,14 +64,14 @@ private[trace] object GrpcSpanFinalizers {
 
   val server: SpanFinalizer.Strategy = {
     case Resource.ExitCase.Succeeded =>
-      SpanFinalizer.addAttribute(CommonAttributes.rpcResponseStatusCode(Status.Code.OK.name()))
+      SpanFinalizer.addAttribute(CommonAttributes.rpcStatusCode(Status.Code.OK.name()))
 
     case Resource.ExitCase.Canceled =>
-      SpanFinalizer.addAttribute(CommonAttributes.rpcResponseStatusCode(Status.Code.CANCELLED.name()))
+      SpanFinalizer.addAttribute(CommonAttributes.rpcStatusCode(Status.Code.CANCELLED.name()))
 
     case Resource.ExitCase.Errored(error) =>
       val code = serverStatusCode(error)
-      val base = SpanFinalizer.addAttribute(CommonAttributes.rpcResponseStatusCode(code.name()))
+      val base = SpanFinalizer.addAttribute(CommonAttributes.rpcStatusCode(code.name()))
 
       if (serverErrorCodes(code)) {
         base |+|

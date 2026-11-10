@@ -223,8 +223,8 @@ object TraceServiceAspect {
 
     /** Default service tracing configuration.
       *
-      * Emits `rpc.system.name`, `rpc.method`, and `rpc.response.status_code`, names spans with the full gRPC method
-      * name, extracts context from ASCII gRPC metadata, and classifies gRPC server errors.
+      * Emits `rpc.system.name`, `rpc.method`, and `rpc.status_code`, names spans with the full gRPC method name,
+      * extracts context from ASCII gRPC metadata, and classifies gRPC server errors.
       */
     def default: Config = {
       ConfigImpl(
@@ -283,7 +283,7 @@ object TraceServiceAspect {
   /** Creates a service tracing aspect using [[Config.default]].
     *
     * Defaults follow the OpenTelemetry gRPC semantic conventions for span kind, span name, `rpc.system.name`,
-    * `rpc.method`, and `rpc.response.status_code`.
+    * `rpc.method`, and `rpc.status_code`.
     *
     * @see
     *   [[https://opentelemetry.io/docs/specs/semconv/rpc/grpc/ OpenTelemetry Semantic conventions for gRPC]]

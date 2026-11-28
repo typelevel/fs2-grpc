@@ -3,6 +3,7 @@ import com.typesafe.tools.mima.core.ProblemFilters._
 import Dependencies._
 
 lazy val Scala3 = "3.3.9"
+lazy val Sbt2Scala = "3.9.0"
 lazy val Scala213 = "2.13.18"
 lazy val Scala212 = "2.12.21"
 
@@ -18,7 +19,7 @@ inThisBuild(
   List(
     githubWorkflowBuildSbtStepPreamble := Seq(),
     scalaVersion := Scala3,
-    tlBaseVersion := "3.1",
+    tlBaseVersion := "3.2",
     startYear := Some(2018),
     licenses := Seq(("MIT", url("https://github.com/typelevel/fs2-grpc/blob/master/LICENSE"))),
     organizationName := "Gary Coady / Fs2 Grpc Developers",
@@ -29,8 +30,8 @@ inThisBuild(
     )
   ) ++ List(
     githubWorkflowJavaVersions := Seq(
-      JavaSpec.temurin("8"),
-      JavaSpec.temurin("17")
+      JavaSpec.temurin("17"),
+      JavaSpec.temurin("8")
     )
   ) ++ List(
     mimaBinaryIssueFilters ++= Seq(
@@ -54,12 +55,17 @@ inThisBuild(
   )
 )
 
+// sbt 2 and its Scala compiler require JDK 17. Keep the sbt 1 and library builds on JDK 8 as well.
+lazy val pluginProjects: Seq[ProjectReference] =
+  if (scala.util.Properties.isJavaAtLeast("17")) plugin.projectRefs else Seq(plugin.jvm(Scala212))
+
 lazy val projects =
   runtime.projectRefs ++ otel4sTrace.projectRefs ++ codegen.projectRefs ++ e2e.projectRefs ++ e2eOtel4s.projectRefs ++
-    List(plugin.project, protocGen.agg.project)
+    pluginProjects ++ List(protocGen.agg.project)
 
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin, NoPublishPlugin)
+  .settings(scalaVersion := Scala3, crossScalaVersions := Nil)
   .aggregate(projects: _*)
   .dependsOn(protocGen.agg)
 
@@ -79,11 +85,11 @@ lazy val codegen = (projectMatrix in file("codegen"))
 lazy val codegenFullName =
   "fs2.grpc.codegen.Fs2CodeGenerator"
 
-lazy val plugin = project
+lazy val plugin = (projectMatrix in file("plugin"))
+  .defaultAxes(VirtualAxis.scalaABIVersion(Scala212), VirtualAxis.jvm)
   .enablePlugins(BuildInfoPlugin, SbtPlugin)
   .settings(
     name := "sbt-fs2-grpc",
-    scalaVersion := Scala212,
     tlVersionIntroduced := Map("2.12" -> "2.5.3"),
     mimaFailOnNoPrevious := false,
     mimaPreviousArtifacts := Set(),
@@ -92,25 +98,41 @@ lazy val plugin = project
       name,
       version,
       scalaVersion,
-      sbtVersion,
+      "sbtVersion" -> (pluginCrossBuild / sbtVersion).value,
       organization,
       "grpcVersion" -> versions.grpc,
       "codeGeneratorName" -> (codegen.jvm(Scala212) / name).value,
       "codeGeneratorFullName" -> codegenFullName,
       "runtimeName" -> (runtime.jvm(Scala212) / name).value
     ),
-    libraryDependencies += scalaPbCompiler,
-    addSbtPlugin(sbtProtoc),
     scriptedBufferLog := false,
     scriptedLaunchOpts ++= Seq("-Xmx1024M", "-Dplugin.version=" + version.value),
     scriptedDependencies := scriptedDependencies
       .dependsOn(Def.taskDyn(runtime.jvm(Scala3) / publishLocal))
-      .dependsOn(Def.taskDyn(codegen.jvm(Scala212) / publishLocal))
       .value,
     test := {
       (Test / test).value
       scripted.toTask("").value
     }
+  )
+  .jvmPlatform(
+    scalaVersions = Seq(Scala212),
+    settings = Seq(
+      libraryDependencies += scalaPbCompiler,
+      addSbtPlugin(sbtProtoc),
+      scriptedDependencies := scriptedDependencies.dependsOn(Def.taskDyn(codegen.jvm(Scala212) / publishLocal)).value
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = Seq(Sbt2Scala),
+    settings = Seq(
+      pluginCrossBuild / sbtVersion := "2.1.0",
+      tlJdkRelease := Some(17),
+      // sbt-protoc supplies protoc-bridge 0.10.0, which upstream tests with ScalaPB 0.11.21.
+      libraryDependencies += scalaPbCompiler.exclude("com.thesamet.scalapb", "protoc-bridge_3"),
+      addSbtPlugin(sbtProtoc.withRevision("1.1.0-RC3")),
+      scriptedDependencies := scriptedDependencies.dependsOn(Def.taskDyn(codegen.jvm(Scala3) / publishLocal)).value
+    )
   )
 
 lazy val runtime = (projectMatrix in file("runtime"))
